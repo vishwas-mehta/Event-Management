@@ -1,25 +1,39 @@
 import { Response } from 'express';
-export const successResponse = (
+
+interface ApiResponse<T = any> {
+    success: boolean;
+    message?: string;
+    data?: T;
+    error?: string;
+}
+
+export const sendSuccess = <T>(
     res: Response,
-    data: any = null,
-    message: string = 'Success',
+    data: T,
+    message?: string,
     statusCode: number = 200
-) => {
-    return res.status(statusCode).json({
+): Response => {
+    const response: ApiResponse<T> = {
         success: true,
-        message,
         data,
-    });
+    };
+
+    if (message) {
+        response.message = message;
+    }
+
+    return res.status(statusCode).json(response);
 };
-export const errorResponse = (
+
+export const sendError = (
     res: Response,
-    message: string = 'Error occurred',
-    statusCode: number = 500,
-    errors: any = null
-) => {
-    return res.status(statusCode).json({
+    error: string,
+    statusCode: number = 500
+): Response => {
+    const response: ApiResponse = {
         success: false,
-        message,
-        errors,
-    });
+        error,
+    };
+
+    return res.status(statusCode).json(response);
 };
