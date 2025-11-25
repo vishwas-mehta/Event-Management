@@ -1,31 +1,35 @@
 import { Request, Response, NextFunction } from 'express';
-import { verifyToken } from '../utils/jwt';
-import { AppError } from '../utils/AppError';
-import { asyncHandler } from '../utils/asyncHandler';
-import { AppDataSource } from '../config/database';
-import { User } from '../entities/User.entity';
-export interface AuthRequest extends Request {
-    user?: User;
+import { verifyToken, JwtPayload } from '../utils/jwt';
+import { UnauthorizedError } from '../utils/AppError';
+
+// Extend Express Request type to include user
+declare global {
+    namespace Express {
+        interface Request {
+            user?: JwtPayload;
+        }
+    }
 }
 
-export const protect = asyncHandler(async (req: AuthRequest, res: Response, next: NextFunction) => {
-    let token;
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
-        token = req.headers.authorization.split(' ')[1];
-    }
-    if (!token) {
-        throw new AppError('Not authorized to access this route', 401);
-    }
+export const authenticate = (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): void => {
     try {
-        const decoded = verifyToken(token);
-        const userRepository = AppDataSource.getRepository(User);
-        const user = await userRepository.findOne({ where: { id: decoded.userId } });
-        if (!user) {
-            throw new AppError('User not found', 404);
+        const authHeader = req.headers.authorization;
+
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            throw new UnauthorizedError('No token provided');
         }
-        req.user = user;
+
+        const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+        const decoded = verifyToken(token);
+        req.user = decoded;
+
         next();
     } catch (error) {
-        throw new AppError('Not authorized to access this route', 401);
+        next(new UnauthorizedError('Invalid or expired token'));
     }
-});
+};

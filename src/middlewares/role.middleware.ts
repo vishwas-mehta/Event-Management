@@ -1,15 +1,37 @@
-import { Response, NextFunction } from 'express';
-import { AuthRequest } from './auth.middleware';
-import { AppError } from '../utils/AppError';
-import { UserRole } from '../entities/User.entity';
-export const authorize = (...roles: UserRole[]) => {
-    return (req: AuthRequest, res: Response, next: NextFunction) => {
-        if (!req.user || !roles.includes(req.user.role)) {
-            throw new AppError(
-                `User role ${req.user?.role} is not authorized to access this route`,
-                403
+import { Request, Response, NextFunction } from 'express';
+import { UserRole, UserStatus } from '../entities/User.entity';
+import { ForbiddenError } from '../utils/AppError';
+
+export const authorize = (allowedRoles: UserRole[]) => {
+    return (req: Request, res: Response, next: NextFunction): void => {
+        if (!req.user) {
+            throw new ForbiddenError('User not authenticated');
+        }
+
+        if (!allowedRoles.includes(req.user.role)) {
+            throw new ForbiddenError(
+                `Access denied. Required roles: ${allowedRoles.join(', ')}`
             );
         }
+
         next();
     };
+};
+
+export const checkOrganizerStatus = (
+    req: Request,
+    res: Response,
+    next: NextFunction
+): void => {
+    if (!req.user) {
+        throw new ForbiddenError('User not authenticated');
+    }
+
+    if (req.user.role === UserRole.ORGANIZER && req.user.status !== UserStatus.ACTIVE) {
+        throw new ForbiddenError(
+            'Your organizer account is pending approval. Please wait for admin approval.'
+        );
+    }
+
+    next();
 };
