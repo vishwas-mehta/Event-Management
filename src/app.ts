@@ -11,7 +11,7 @@ type Application = any;
 import authRoutes from './routes/auth.routes';
 // import adminRoutes from './routes/admin.routes';
 // import organizerRoutes from './routes/organizer.routes';
-// import eventRoutes from './routes/event.routes';
+import eventRoutes from './routes/event.routes';
 // import attendeeRoutes from './routes/attendee.routes';
 
 // Middleware
@@ -50,7 +50,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 // app.use('/api/admin', adminRoutes);
 // app.use('/api/organizer', organizerRoutes);
-// app.use('/api/events', eventRoutes);
+app.use('/api/events', eventRoutes);
 // app.use('/api/attendee', attendeeRoutes);
 
 // 404 handler
