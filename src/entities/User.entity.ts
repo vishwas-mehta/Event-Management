@@ -9,57 +9,57 @@ import {
 import { Event } from './Event.entity';
 import { Booking } from './Booking.entity';
 import { Review } from './Review.entity';
-import { Waitlist } from './Waitlist.entity';       
+import { Waitlist } from './Waitlist.entity';
 import { ReportedEvent } from './ReportedEvent.entity';
 
-export enum UserRole{
-    ADMIN ='admin',
+export enum UserRole {
+    ADMIN = 'admin',
     ORGANIZER = 'organizer',
     ATTENDEE = 'attendee',
 }
 
-export enum UserStatus{
-    ACTIVE='active',
-    PENDING ='pending',
-    BLOCKED ='blocked',
+export enum UserStatus {
+    ACTIVE = 'active',
+    PENDING = 'pending',
+    BLOCKED = 'blocked',
 }
 
 @Entity('users')
 export class User {
     @PrimaryGeneratedColumn('uuid')
-    id:string;
+    id: string;
 
-    @Column({unique:true})
-    email:string;
+    @Column({ unique: true })
+    email: string;
 
     @Column()
-    password:string;
+    password: string;
 
-    @Column({name: 'first_name'})
-    firstName:string;
+    @Column({ name: 'first_name' })
+    firstName: string;
 
-    @Column({name: 'last_name'})
-    lastName:string;
+    @Column({ name: 'last_name' })
+    lastName: string;
 
     @Column({
-        type:'enum',
+        type: 'enum',
         enum: UserRole,
         default: UserRole.ATTENDEE,
     })
-    role:UserRole;
+    role: UserRole;
 
     @Column({
-        type:'enum',
+        type: 'enum',
         enum: UserStatus,
-        default: UserStatus.PENDING,
+        default: UserStatus.ACTIVE,
     })
-    status:UserStatus;
+    status: UserStatus;
 
-    @Column({ name:'phone_number', nullable:true})
-    phoneNumber:string;
-    
-    @Column({name: 'profile_image', nullable:true})
-    profileImage:string;
+    @Column({ name: 'phone_number', nullable: true })
+    phoneNumber: string;
+
+    @Column({ name: 'profile_image', nullable: true })
+    profileImage: string;
 
     @OneToMany(() => Event, (event) => event.organizer)
     events: Event[];
@@ -76,9 +76,9 @@ export class User {
     @OneToMany(() => ReportedEvent, (report) => report.reportedBy)
     reportedEvents: ReportedEvent[];
 
-    @CreateDateColumn({ name: 'created_at'})
-    createAt: Date;
+    @CreateDateColumn({ name: 'created_at' })
+    createdAt: Date;
 
-    @UpdateDateColumn({ name: 'updated_at'})
+    @UpdateDateColumn({ name: 'updated_at' })
     updatedAt: Date;
 }
