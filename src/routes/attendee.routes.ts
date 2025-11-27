@@ -7,8 +7,11 @@ import { UserRole } from "../entities/User.entity";
 const router = Router();
 const attendeeController = new AttendeeController();
 
+
 router.use(authenticate, authorize([UserRole.ATTENDEE]));
 
+
+// Bookings
 router.post('/bookings', attendeeController.bookTicket);
 router.get('/bookings', attendeeController.getMyBookings);
 router.get('/bookings/:id', attendeeController.getBookingById);
