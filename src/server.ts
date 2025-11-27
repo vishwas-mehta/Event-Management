@@ -8,8 +8,8 @@ import { start } from 'repl';
 const startServer = async()  => {
     try {
         await initializeDatabase();
-        // const PORT = env.port || 5000;
-        const PORT = 7000;
+        const PORT = env.port || 5000;
+        // const PORT = 7000;
         app.listen(PORT, ()=>{
             console.log(`Event Management Api server started on port ${PORT}`)
         })
