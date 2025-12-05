@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { attendeeApi } from '../../api/attendee.api';
-import { Booking, BookingStatus } from '../../types';
+import type { Booking } from '../../types';
+import { BookingStatus } from '../../types';
 import { formatEventDateTime, isEventPast, isEventUpcoming } from '../../utils/dateFormat';
-import LoadingSpinner from '@/components/Common/LoadingSpinner';
+import LoadingSpinner from '../../components/Common/LoadingSpinner';
 
 const AttendeeDashboard: React.FC = () => {
     const [bookings, setBookings] = useState<Booking[]>([]);
