@@ -6,7 +6,7 @@ import type {
     Category,
     Review,
     PaginatedResponse
-} from '@/types';
+} from '../types';
 
 export const eventsApi = {
     // Get all events with filters

@@ -7,7 +7,7 @@ import type {
     TicketType,
     OrganizerDashboardStats,
     Booking
-} from '@/types';
+} from '../types';
 
 export const organizerApi = {
     // Get organizer dashboard

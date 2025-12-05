@@ -5,7 +5,7 @@ import type {
     LoginCredentials,
     RegisterData,
     User
-} from '@/types';
+} from '../types';
 
 export const authApi = {
     // Register new user
