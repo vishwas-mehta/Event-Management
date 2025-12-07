@@ -14,19 +14,19 @@ import EventDetailsPage from './pages/Events/EventDetailsPage';
 
 // Admin Pages
 import AdminDashboard from './pages/Admin/AdminDashboard';
-import ManageUsersPage from '@/pages/Admin/ManageUsersPage';
-import PendingOrganizersPage from '@/pages/Admin/PendingOrganizersPage';
-import ReportedEventsPage from '@/pages/Admin/ReportedEventsPage';
+import ManageUsersPage from './pages/Admin/ManageUsersPage';
+import PendingOrganizersPage from './pages/Admin/PendingOrganizersPage';
+import ReportedEventsPage from './pages/Admin/ReportedEventsPage';
 
 // Organizer Pages
-import OrganizerDashboard from '@/pages/Organizer/OrganizerDashboard';
-import CreateEventPage from '@/pages/Organizer/CreateEventPage';
-import EditEventPage from '@/pages/Organizer/EditEventPage';
-import ManageEventPage from '@/pages/Organizer/ManageEventPage';
+import OrganizerDashboard from './pages/Organizer/OrganizerDashboard';
+import CreateEventPage from './pages/Organizer/CreateEventPage';
+import EditEventPage from './pages/Organizer/EditEventPage';
+import ManageEventPage from './pages/Organizer/ManageEventPage';
 
 // Attendee Pages
-import AttendeeDashboard from '@/pages/Attendee/AttendeeDashboard';
-import MyBookingsPage from '@/pages/Attendee/MyBookingsPage';
+import AttendeeDashboard from './pages/Attendee/AttendeeDashboard';
+import MyBookingsPage from './pages/Attendee/MyBookingsPage';
 
 const AppRoutes: React.FC = () => {
   return (
