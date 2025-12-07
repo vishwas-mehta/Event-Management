@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Form, Button, Card } from 'react-bootstrap';
 import { eventsApi } from '../../api/events.api';
-import { Event, EventFilters, Category } from '../../types';
+import type { Event, EventFilters, Category } from '../../types';
 import EventCard from '../../components/Events/EventCard';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ErrorAlert from '../../components/Common/ErrorAlert';
