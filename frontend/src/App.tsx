@@ -1,19 +1,19 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import MainLayout from '@/components/Layout/MainLayout';
-import ProtectedRoute from '@/components/Common/ProtectedRoute';
-import { UserRole } from '@/types';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import MainLayout from './components/Layout/MainLayout';
+import ProtectedRoute from './components/Common/ProtectedRoute';
+import { UserRole } from './types';
 
 // Pages
-import HomePage from '@/pages/Home/HomePage';
-import LoginPage from '@/pages/Auth/LoginPage';
-import RegisterPage from '@/pages/Auth/RegisterPage';
-import EventsPage from '@/pages/Events/EventsPage';
-import EventDetailsPage from '@/pages/Events/EventDetailsPage';
+import HomePage from './pages/Home/HomePage';
+import LoginPage from './pages/Auth/LoginPage';
+import RegisterPage from './pages/Auth/RegisterPage';
+import EventsPage from './pages/Events/EventsPage';
+import EventDetailsPage from './pages/Events/EventDetailsPage';
 
 // Admin Pages
-import AdminDashboard from '@/pages/Admin/AdminDashboard';
+import AdminDashboard from './pages/Admin/AdminDashboard';
 import ManageUsersPage from '@/pages/Admin/ManageUsersPage';
 import PendingOrganizersPage from '@/pages/Admin/PendingOrganizersPage';
 import ReportedEventsPage from '@/pages/Admin/ReportedEventsPage';
