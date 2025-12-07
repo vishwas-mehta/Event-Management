@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { organizerApi } from '../../api/organizer.api';
-import { OrganizerDashboardStats } from '../../types';
+import type { OrganizerDashboardStats } from '../../types';
 import { formatEventDateTime } from '../../utils/dateFormat';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 

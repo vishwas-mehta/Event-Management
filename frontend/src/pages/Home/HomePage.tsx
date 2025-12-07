@@ -172,7 +172,7 @@ const HomePage: React.FC = () => {
                                     background: 'white',
                                     borderRadius: '50%',
                                     display: 'flex',
-                                    alignments: 'center',
+                                    alignItems: 'center',
                                     justifyContent: 'center',
                                     margin: '0 auto',
                                     boxShadow: 'var(--shadow-lg)',

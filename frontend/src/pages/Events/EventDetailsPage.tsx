@@ -4,7 +4,8 @@ import { Container, Row, Col, Card, Button, Badge, Alert, Modal, Form } from 're
 import { eventsApi } from '../../api/events.api';
 import { attendeeApi } from '../../api/attendee.api';
 import { useAuth } from '../../contexts/AuthContext';
-import { Event, TicketType, UserRole } from '../../types';
+import type { Event, TicketType } from '../../types';
+import { UserRole } from '../../types';
 import { formatEventDateTime } from '../../utils/dateFormat';
 import { formatPrice } from '../../utils/priceFormat';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';

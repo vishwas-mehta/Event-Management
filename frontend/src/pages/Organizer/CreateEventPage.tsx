@@ -3,7 +3,7 @@ import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap'
 import { useNavigate } from 'react-router-dom';
 import { organizerApi } from '../../api/organizer.api';
 import { eventsApi } from '../../api/events.api';
-import { Category } from '../../types';
+import type { Category } from '../../types';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ErrorAlert from '../../components/Common/ErrorAlert';
 
