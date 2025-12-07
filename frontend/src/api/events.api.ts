@@ -1,17 +1,17 @@
 import api from './axios';
 import type {
     ApiResponse,
-    Event,
+    EventType,
     EventFilters,
-    Category,
-    Review,
+    CategoryType,
+    ReviewType,
     PaginatedResponse
 } from '../types';
 
 export const eventsApi = {
     // Get all events with filters
     getEvents: async (filters?: EventFilters): Promise<ApiResponse<{
-        events: Event[];
+        events: EventType[];
         pagination: {
             total: number;
             page: number;
@@ -32,13 +32,13 @@ export const eventsApi = {
     },
 
     // Get event by ID
-    getEventById: async (id: string): Promise<ApiResponse<{ event: Event }>> => {
+    getEventById: async (id: string): Promise<ApiResponse<{ event: EventType }>> => {
         const response = await api.get(`/events/${id}`);
         return response.data;
     },
 
     // Get all categories
-    getCategories: async (): Promise<ApiResponse<{ categories: Category[] }>> => {
+    getCategories: async (): Promise<ApiResponse<{ categories: CategoryType[] }>> => {
         const response = await api.get('/events/categories');
         return response.data;
     },
@@ -55,7 +55,7 @@ export const eventsApi = {
         page: number = 1,
         limit: number = 10
     ): Promise<ApiResponse<{
-        reviews: Review[];
+        reviews: ReviewType[];
         pagination: {
             total: number;
             page: number;

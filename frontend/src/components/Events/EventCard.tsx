@@ -1,12 +1,12 @@
 import React from 'react';
 import { Card, Badge } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
-import { Event } from '../../types';
+import type { EventType } from '../../types';
 import { formatEventDateTime } from '../../utils/dateFormat';
 import { formatPriceRange } from '../../utils/priceFormat';
 
 interface EventCardProps {
-    event: Event;
+    event: EventType;
 }
 
 const EventCard: React.FC<EventCardProps> = ({ event }) => {

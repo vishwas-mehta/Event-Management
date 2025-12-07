@@ -1,21 +1,21 @@
 import api from './axios';
 import type {
     ApiResponse,
-    Booking,
+    BookingType,
     BookingFormData,
     ReviewFormData,
-    Review
+    ReviewType
 } from '../types';
 
 export const attendeeApi = {
     // Book ticket
-    bookTicket: async (data: BookingFormData): Promise<ApiResponse<{ booking: Booking }>> => {
+    bookTicket: async (data: BookingFormData): Promise<ApiResponse<{ booking: BookingType }>> => {
         const response = await api.post('/attendee/bookings', data);
         return response.data;
     },
 
     // Get my bookings
-    getMyBookings: async (): Promise<ApiResponse<{ bookings: Booking[] }>> => {
+    getMyBookings: async (): Promise<ApiResponse<{ bookings: BookingType[] }>> => {
         const response = await api.get('/attendee/bookings');
         return response.data;
     },
@@ -33,7 +33,7 @@ export const attendeeApi = {
     },
 
     // Create review
-    createReview: async (eventId: string, data: ReviewFormData): Promise<ApiResponse<{ review: Review }>> => {
+    createReview: async (eventId: string, data: ReviewFormData): Promise<ApiResponse<{ review: ReviewType }>> => {
         const response = await api.post(`/attendee/events/${eventId}/reviews`, data);
         return response.data;
     },

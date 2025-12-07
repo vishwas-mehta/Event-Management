@@ -2,14 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Card, Button, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import { attendeeApi } from '../../api/attendee.api';
-import {BookingStatus, Booking} from '../../types';
+import { BookingStatus } from '../../types';
+import type { BookingType } from '../../types';
 import { formatEventDateTime } from '../../utils/dateFormat';
 import { formatPrice } from '../../utils/priceFormat';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ErrorAlert from '../../components/Common/ErrorAlert';
 
 const MyBookingsPage: React.FC = () => {
-    const [bookings, setBookings] = useState<Booking[]>([]);
+    const [bookings, setBookings] = useState<BookingType[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [actionLoading, setActionLoading] = useState<string | null>(null);

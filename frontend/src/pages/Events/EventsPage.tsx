@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Container, Row, Col, Form, Button, Card } from 'react-bootstrap';
 import { eventsApi } from '../../api/events.api';
-import type { Event, EventFilters, Category } from '../../types';
+import type { EventType, EventFilters, CategoryType } from '../../types';
 import EventCard from '../../components/Events/EventCard';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ErrorAlert from '../../components/Common/ErrorAlert';
 import Pagination from '../../components/Common/Pagination';
 
 const EventsPage: React.FC = () => {
-    const [events, setEvents] = useState<Event[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
+    const [events, setEvents] = useState<EventType[]>([]);
+    const [categories, setCategories] = useState<CategoryType[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [filters, setFilters] = useState<EventFilters>({

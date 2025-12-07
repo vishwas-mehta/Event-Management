@@ -4,7 +4,7 @@ import { Container, Row, Col, Card, Button, Badge, Alert, Modal, Form } from 're
 import { eventsApi } from '../../api/events.api';
 import { attendeeApi } from '../../api/attendee.api';
 import { useAuth } from '../../contexts/AuthContext';
-import type { Event, TicketType } from '../../types';
+import type { EventType, TicketType } from '../../types';
 import { UserRole } from '../../types';
 import { formatEventDateTime } from '../../utils/dateFormat';
 import { formatPrice } from '../../utils/priceFormat';
@@ -14,7 +14,7 @@ import ErrorAlert from '../../components/Common/ErrorAlert';
 const EventDetailsPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
-    const [event, setEvent] = useState<Event | null>(null);
+    const [event, setEvent] = useState<EventType | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showBookingModal, setShowBookingModal] = useState(false);

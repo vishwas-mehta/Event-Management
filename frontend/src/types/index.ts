@@ -25,7 +25,7 @@ export interface User {
 }
 
 // Types for Category
-export interface Category {
+export interface CategoryType {
     id: string;
     name: string;
     slug: string;
@@ -55,7 +55,7 @@ export interface TicketType {
 }
 
 // Types for Event
-export interface Event {
+export interface EventType {
     id: string;
     organizerId: string;
     categoryId: string;
@@ -79,9 +79,9 @@ export interface Event {
         lastName: string;
         email?: string;
     };
-    category?: Category;
+    category?: CategoryType;
     ticketTypes?: TicketType[];
-    reviews?: Review[];
+    reviews?: ReviewType[];
     averageRating?: number;
     totalReviews?: number;
     createdAt?: string;
@@ -102,7 +102,7 @@ export enum PaymentStatus {
     REFUNDED = 'refunded',
 }
 
-export interface Booking {
+export interface BookingType {
     id: string;
     userId: string;
     eventId: string;
@@ -116,13 +116,13 @@ export interface Booking {
     bookedAt: string;
     cancelledAt?: string;
     attendedAt?: string;
-    event?: Event;
+    event?: EventType;
     ticketType?: TicketType;
     user?: User;
 }
 
 // Types for Review
-export interface Review {
+export interface ReviewType {
     id: string;
     userId: string;
     eventId: string;
@@ -147,7 +147,7 @@ export interface ReportedEvent {
     reportedById: string;
     reason: string;
     status: string;
-    event?: Event;
+    event?: EventType;
     reportedBy?: User;
     createdAt: string;
 }
@@ -226,7 +226,7 @@ export interface OrganizerDashboardStats {
     totalEvents: number;
     totalBookings: number;
     upcomingEvents: number;
-    events: Event[];
+    events: EventType[];
 }
 
 export interface AdminDashboardStats {

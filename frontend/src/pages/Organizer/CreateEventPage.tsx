@@ -3,13 +3,13 @@ import { Container, Row, Col, Card, Form, Button } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { organizerApi } from '../../api/organizer.api';
 import { eventsApi } from '../../api/events.api';
-import type { Category } from '../../types';
+import type { CategoryType } from '../../types';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ErrorAlert from '../../components/Common/ErrorAlert';
 
 const CreateEventPage: React.FC = () => {
     const navigate = useNavigate();
-    const [categories, setCategories] = useState<Category[]>([]);
+    const [categories, setCategories] = useState<CategoryType[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');

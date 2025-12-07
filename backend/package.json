@@ -13,7 +13,9 @@
     "migration:revert": "npm run typeorm -- migration:revert -d src/config/database.ts",
     "seed": "ts-node src/seeds/index.ts"
   },
-  "keywords": ["event-management"],
+  "keywords": [
+    "event-management"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",

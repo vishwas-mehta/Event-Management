@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>React Test</title>
+</head>
+<body>
+    <div id="test-root"></div>
+    <script type="module">
+        import React from '/node_modules/.vite/deps/react.js?v=e6d21444';
+        import ReactDOM from '/node_modules/.vite/deps/react-dom_client.js?v=e6d21444';
+        
+        console.log('React:', React);
+        console.log('ReactDOM:', ReactDOM);
+        
+        const root = ReactDOM.createRoot(document.getElementById('test-root'));
+        root.render(React.createElement('h1', {}, 'Hello from React!'));
+    </script>
+</body>
+</html>
