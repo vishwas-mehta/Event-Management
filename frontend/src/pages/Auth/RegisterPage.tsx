@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Container, Form, Button, Card, Alert, Row, Col } from 'react-bootstrap';
 import { useAuth } from '../../contexts/AuthContext';
+import { extractErrorMessage } from '../../utils/errorHelper';
 
 const RegisterPage: React.FC = () => {
     const [formData, setFormData] = useState({
@@ -65,10 +66,7 @@ const RegisterPage: React.FC = () => {
             console.error('Error response:', err.response);
             console.error('Error message:', err.message);
 
-            const errorMessage = err.response?.data?.error?.message
-                || err.response?.data?.message
-                || err.message
-                || 'Failed to register. Please try again.';
+            const errorMessage = extractErrorMessage(err, 'Failed to register. Please try again.');
 
             setError(errorMessage);
         } finally {

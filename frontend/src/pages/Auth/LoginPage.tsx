@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Container, Form, Button, Card, Alert } from 'react-bootstrap';
 import { useAuth } from '../../contexts/AuthContext';
+import { extractErrorMessage } from '../../utils/errorHelper';
 
 const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -20,7 +21,7 @@ const LoginPage: React.FC = () => {
             await login({ email, password });
             navigate('/');
         } catch (err: any) {
-            setError(err.response?.data?.error?.message || 'Failed to login. Please check your credentials.');
+            setError(extractErrorMessage(err, 'Failed to login. Please check your credentials.'));
         } finally {
             setLoading(false);
         }

@@ -7,6 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { EventType, TicketType } from '../../types';
 import { UserRole } from '../../types';
 import { formatEventDateTime } from '../../utils/dateFormat';
+import { extractErrorMessage } from '../../utils/errorHelper';
 import { formatPrice } from '../../utils/priceFormat';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ErrorAlert from '../../components/Common/ErrorAlert';
@@ -39,8 +40,7 @@ const EventDetailsPage: React.FC = () => {
             setEvent(response.data.event);
         } catch (err: any) {
             console.error('Error loading event:', err);
-            console.error('Error response:', err.response);
-            setError('Failed to load event details. Please try again.');
+            setError(extractErrorMessage(err, 'Failed to load event details. Please try again.'));
         } finally {
             setLoading(false);
         }
@@ -59,6 +59,18 @@ const EventDetailsPage: React.FC = () => {
     const confirmBooking = async () => {
         if (!selectedTicket || !event) return;
 
+        // Pre-booking validation
+        const available = selectedTicket.capacity - selectedTicket.sold;
+        if (quantity > available) {
+            setError(`Only ${available} ticket${available !== 1 ? 's' : ''} available. Please reduce your quantity.`);
+            return;
+        }
+
+        if (quantity < 1) {
+            setError('Quantity must be at least 1.');
+            return;
+        }
+
         setBookingLoading(true);
         setError('');
         try {
@@ -71,7 +83,7 @@ const EventDetailsPage: React.FC = () => {
             setShowBookingModal(false);
             loadEvent(); // Reload to update availability
         } catch (err: any) {
-            setError(err.response?.data?.error?.message || 'Failed to book ticket. Please try again.');
+            setError(extractErrorMessage(err, 'Failed to book ticket. Please try again.'));
         } finally {
             setBookingLoading(false);
         }

@@ -6,6 +6,7 @@ import { BookingStatus } from '../../types';
 import type { BookingType } from '../../types';
 import { formatEventDateTime } from '../../utils/dateFormat';
 import { formatPrice } from '../../utils/priceFormat';
+import { extractErrorMessage } from '../../utils/errorHelper';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ErrorAlert from '../../components/Common/ErrorAlert';
 
@@ -43,7 +44,7 @@ const MyBookingsPage: React.FC = () => {
             setSuccess('Booking cancelled successfully.');
             loadBookings();
         } catch (err: any) {
-            setError(err.response?.data?.error?.message || 'Failed to cancel booking.');
+            setError(extractErrorMessage(err, 'Failed to cancel booking.'));
         } finally {
             setActionLoading(null);
         }
@@ -57,7 +58,7 @@ const MyBookingsPage: React.FC = () => {
             setSuccess('Attendance marked successfully.');
             loadBookings();
         } catch (err: any) {
-            setError(err.response?.data?.error?.message || 'Failed to mark attendance.');
+            setError(extractErrorMessage(err, 'Failed to mark attendance.'));
         } finally {
             setActionLoading(null);
         }

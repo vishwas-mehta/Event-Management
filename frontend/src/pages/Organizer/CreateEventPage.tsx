@@ -6,6 +6,7 @@ import { eventsApi } from '../../api/events.api';
 import type { CategoryType } from '../../types';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ErrorAlert from '../../components/Common/ErrorAlert';
+import { extractErrorMessage } from '../../utils/errorHelper';
 
 const CreateEventPage: React.FC = () => {
     const navigate = useNavigate();
@@ -81,7 +82,7 @@ const CreateEventPage: React.FC = () => {
 
             navigate(`/organizer/dashboard`);
         } catch (err: any) {
-            setError(err.response?.data?.error?.message || 'Failed to create event. Please try again.');
+            setError(extractErrorMessage(err, 'Failed to create event. Please try again.'));
         } finally {
             setSubmitting(false);
         }

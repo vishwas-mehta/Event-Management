@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Container, Card, Table, Button, Alert } from 'react-bootstrap';
 import { adminApi } from '../../api/admin.api';
 import type { User } from '../../types';
+import { extractErrorMessage } from '../../utils/errorHelper';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 
 const PendingOrganizersPage: React.FC = () => {
@@ -34,7 +35,7 @@ const PendingOrganizersPage: React.FC = () => {
             setSuccess('Organizer approved successfully');
             loadPendingOrganizers();
         } catch (err: any) {
-            setError(err.response?.data?.error?.message || 'Failed to approve organizer');
+            setError(extractErrorMessage(err, 'Failed to approve organizer'));
         } finally {
             setActionLoading(null);
         }
@@ -50,7 +51,7 @@ const PendingOrganizersPage: React.FC = () => {
             setSuccess('Organizer rejected');
             loadPendingOrganizers();
         } catch (err: any) {
-            setError(err.response?.data?.error?.message || 'Failed to reject organizer');
+            setError(extractErrorMessage(err, 'Failed to reject organizer'));
         } finally {
             setActionLoading(null);
         }
