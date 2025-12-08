@@ -1,4 +1,4 @@
-import {Router} from "express";
+import { Router } from "express";
 import { AttendeeController } from "../controllers/attendee.controller";
 import { authenticate } from "../middlewares/auth.middleware";
 import { authorize } from "../middlewares/role.middleware";
@@ -16,7 +16,7 @@ router.post('/bookings', attendeeController.bookTicket);
 router.get('/bookings', attendeeController.getMyBookings);
 router.get('/bookings/:id', attendeeController.getBookingById);
 router.delete('/bookings/:id', attendeeController.cancelBooking);
-router.post('bookings/:id/attend', attendeeController.markAttendance);
+router.post('/bookings/:id/attend', attendeeController.markAttendance);
 
 // Reviews
 router.post('/events/:eventId/reviews', attendeeController.createReview);
