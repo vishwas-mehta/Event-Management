@@ -102,14 +102,39 @@ const EventDetailsPage: React.FC = () => {
                 </Alert>
             )}
 
-            {/* Event Banner - Image or YouTube Video */}
-            {event.bannerImage && (
+            {/* Event Media - Banner Image and/or Video */}
+            {(event.bannerImage || event.teaserVideo) && (
                 <div className="mb-4">
-                    {isYouTubeUrl(event.bannerImage) ? (
-                        /* YouTube Video Embed */
+                    {/* Check teaserVideo first for YouTube, then bannerImage */}
+                    {event.teaserVideo && isYouTubeUrl(event.teaserVideo) ? (
+                        /* YouTube Video from teaserVideo field */
                         <div style={{
                             position: 'relative',
-                            paddingTop: '56.25%', // 16:9 aspect ratio
+                            paddingTop: '56.25%',
+                            borderRadius: '0.375rem',
+                            overflow: 'hidden',
+                            background: '#000'
+                        }}>
+                            <iframe
+                                style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: '100%',
+                                    border: 'none'
+                                }}
+                                src={getYouTubeEmbedUrl(getYouTubeVideoId(event.teaserVideo)!)}
+                                title={event.title}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                            />
+                        </div>
+                    ) : event.bannerImage && isYouTubeUrl(event.bannerImage) ? (
+                        /* YouTube Video from bannerImage field (fallback) */
+                        <div style={{
+                            position: 'relative',
+                            paddingTop: '56.25%',
                             borderRadius: '0.375rem',
                             overflow: 'hidden',
                             background: '#000'
@@ -129,7 +154,7 @@ const EventDetailsPage: React.FC = () => {
                                 allowFullScreen
                             />
                         </div>
-                    ) : (
+                    ) : event.bannerImage ? (
                         /* Regular Image */
                         <img
                             src={event.bannerImage}
@@ -141,7 +166,7 @@ const EventDetailsPage: React.FC = () => {
                                 objectPosition: 'center'
                             }}
                         />
-                    )}
+                    ) : null}
                 </div>
             )}
 

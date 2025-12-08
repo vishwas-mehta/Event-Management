@@ -34,6 +34,12 @@ export const organizerApi = {
         return response.data;
     },
 
+    // Alias for getEvent
+    getEventById: async (id: string): Promise<ApiResponse<{ event: EventType }>> => {
+        const response = await api.get(`/organizer/events/${id}`);
+        return response.data;
+    },
+
     // Update event
     updateEvent: async (id: string, data: Partial<EventFormData>): Promise<ApiResponse<{ event: EventType }>> => {
         const response = await api.put(`/organizer/events/${id}`, data);
@@ -52,6 +58,12 @@ export const organizerApi = {
         data: TicketTypeFormData
     ): Promise<ApiResponse<{ ticketType: TicketType }>> => {
         const response = await api.post(`/organizer/events/${eventId}/ticket-types`, data);
+        return response.data;
+    },
+
+    // Delete ticket type
+    deleteTicketType: async (ticketId: string): Promise<ApiResponse<{ message: string }>> => {
+        const response = await api.delete(`/organizer/ticket-types/${ticketId}`);
         return response.data;
     },
 
