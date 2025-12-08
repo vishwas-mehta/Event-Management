@@ -166,13 +166,25 @@ export class OrganizerController {
 
         const event = await this.eventRepository.findOne({
             where: { id, organizerId },
+            relations: ['ticketTypes', 'bookings'],
         });
 
         if (!event) {
             throw new NotFoundError('Event not found or you do not have permission');
         }
 
-        await this.eventRepository.remove(event);
+        // Check if there are any bookings - prevent deletion if so
+        if (event.bookings && event.bookings.length > 0) {
+            throw new ValidationError('Cannot delete event with existing bookings. Please cancel all bookings first.');
+        }
+
+        // Delete ticket types first, then the event
+        await AppDataSource.transaction(async (manager) => {
+            if (event.ticketTypes && event.ticketTypes.length > 0) {
+                await manager.remove(event.ticketTypes);
+            }
+            await manager.remove(event);
+        });
 
         return sendSuccess(res, { message: 'Event deleted successfully' }, 'Event deleted successfully');
     });
