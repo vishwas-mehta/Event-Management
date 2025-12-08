@@ -236,6 +236,7 @@ export class OrganizerController {
         const ticketType = this.ticketTypeRepository.create({
             ...ticketData,
             eventId,
+            price: 0, // All events are free for now
         });
 
         await this.ticketTypeRepository.save(ticketType);
@@ -266,6 +267,11 @@ export class OrganizerController {
             throw new ValidationError(
                 `Cannot reduce capacity below ${ticketType.sold} (tickets already sold)`
             );
+        }
+
+        // Ensure price stays at 0 (all events are free)
+        if (updateData.price !== undefined) {
+            updateData.price = 0;
         }
 
         Object.assign(ticketType, updateData);
