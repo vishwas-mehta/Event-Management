@@ -90,10 +90,22 @@ export class OrganizerController {
             })
         )) as unknown as Event;
 
+        // Auto-create a default ticket type so the event can accept bookings
+        await this.ticketTypeRepository.save(
+            this.ticketTypeRepository.create({
+                eventId: newEvent.id,
+                name: 'General Admission',
+                description: 'Standard entry ticket',
+                price: 0, // Free events
+                capacity: eventData.capacity || 100,
+                sold: 0,
+            })
+        );
+
         // Load relations
         const createdEvent = await this.eventRepository.findOne({
             where: { id: newEvent.id },
-            relations: ['category', 'organizer'],
+            relations: ['category', 'organizer', 'ticketTypes'],
         });
 
         return sendSuccess(res, { event: createdEvent }, 'Event created successfully', 201);

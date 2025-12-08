@@ -51,7 +51,7 @@ const EditEventPage: React.FC = () => {
             // Load attendees separately
             try {
                 const attendeesRes = await organizerApi.getEventAttendees(id!);
-                setAttendees(attendeesRes.data.bookings || []);
+                setAttendees(attendeesRes.data.attendees || []);
             } catch {
                 setAttendees([]);
             }

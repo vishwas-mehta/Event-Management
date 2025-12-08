@@ -68,7 +68,7 @@ export const organizerApi = {
     },
 
     // Get event attendees
-    getEventAttendees: async (eventId: string): Promise<ApiResponse<{ bookings: BookingType[] }>> => {
+    getEventAttendees: async (eventId: string): Promise<ApiResponse<{ attendees: any[] }>> => {
         const response = await api.get(`/organizer/events/${eventId}/attendees`);
         return response.data;
     },
