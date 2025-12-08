@@ -1,0 +1,224 @@
+Event Management System - Chatbot Knowledge Base
+=================================================
+
+ABOUT THE APPLICATION
+---------------------
+This is an Event Management System that helps users discover, book, organize, and manage events through a unified platform. The system supports three primary user roles: Attendees, Organizers, and Administrators, each with specific permissions and workflows.
+
+The platform is built using the MERN stack (MongoDB/PostgreSQL, Express, React, Node.js) and provides a modern, user-friendly interface for all event-related activities.
+
+
+USER ROLES AND PERMISSIONS
+---------------------------
+
+1. ATTENDEE
+   - Browse and search for events across different categories
+   - Book tickets for events they're interested in
+   - View all their current and past bookings
+   - Cancel event bookings when needed
+   - Receive event reminders and updates
+   - View event details including location, date, time, and capacity
+
+2. ORGANIZER
+   - Create new events with detailed information
+   - Edit or delete their own events
+   - Manage event ticket capacity and availability
+   - View complete attendee lists for their events
+   - Track event performance and booking statistics
+   - Upload event images and media
+   - Update event details anytime before the event ends
+
+3. ADMINISTRATOR
+   - Full access to manage all events on the platform
+   - Manage user accounts (attendees and organizers)
+   - Configure system-wide settings
+   - Moderate event content for compliance
+   - View comprehensive system analytics and reports
+   - Delete or modify any event for safety/moderation purposes
+
+
+MAIN FEATURES
+-------------
+
+EVENT DISCOVERY
+- Search events by name, category, date, or location
+- Filter events by type (free/paid, online/offline)
+- Filter by capacity availability
+- View detailed event pages with all necessary information
+- Browse events by categories
+- See upcoming and featured events
+
+EVENT BOOKING
+- Secure ticket booking with real-time capacity tracking
+- Instant booking confirmation
+- Prevents overbooking through capacity management
+- Simple and fast checkout process
+- Booking reference for each reservation
+
+MY BOOKINGS (ATTENDEE DASHBOARD)
+- View all past and upcoming booked events
+- Cancel bookings when necessary
+- Download or view booking details
+- Track booking history
+- Access event information from bookings page
+
+EVENT MANAGEMENT (ORGANIZER DASHBOARD)
+- Create events with comprehensive details
+- Upload event images and promotional content
+- Edit and update event information
+- View complete participant/attendee lists
+- Track real-time booking statistics
+- Monitor event capacity and availability
+- Delete events if needed
+
+USER AUTHENTICATION & SECURITY
+- Secure user registration and login
+- Role-based access control (Attendee, Organizer, Admin)
+- Password protection and encryption
+- Password reset functionality
+- Session management for security
+
+
+FREQUENTLY ASKED QUESTIONS (FAQ)
+---------------------------------
+
+BOOKING & ATTENDANCE
+
+Q: How do I book an event?
+A: Navigate to the Events page, browse or search for an event you're interested in, click on it to view details, and then click the "Book Now" button. You must be logged in to book events.
+
+Q: Can I cancel my booking?
+A: Yes. Go to the "My Bookings" page, find the event you want to cancel, and click the "Cancel Booking" button. Cancellation policies may vary by event.
+
+Q: Is there a limit on how many events I can book?
+A: No, you can book as many events as you want, provided each event still has available capacity.
+
+Q: What happens if an event reaches full capacity?
+A: The booking button will be disabled, and the event will be marked as "Full" or "Sold Out". You won't be able to book until capacity opens up.
+
+Q: Do I get notifications for my booked events?
+A: Yes, attendees receive automated email reminders for their upcoming booked events.
+
+Q: Can I see my past bookings?
+A: Yes, the "My Bookings" page shows both your upcoming events and your booking history.
+
+
+EVENT CREATION & MANAGEMENT
+
+Q: How do I create an event?
+A: You must be logged in with an Organizer account. Go to your Dashboard and click "Create Event", then fill in all the required details.
+
+Q: What information is required to create an event?
+A: You need to provide: Event title, description, date and time, location, maximum capacity, event category, and optionally an event image or thumbnail.
+
+Q: How do I become an Organizer?
+A: You can register with an Organizer account during signup, or request a role upgrade from a system Administrator.
+
+Q: Can I edit an event after publishing it?
+A: Yes, organizers can edit their event details at any time before the event ends. However, you cannot edit events that have already concluded.
+
+Q: How do I view attendees for my event?
+A: Go to "My Events" in your organizer dashboard, select the event, and click "View Attendees" or "Attendee List" to see all registered participants.
+
+Q: Can I delete an event I created?
+A: Yes, organizers can delete their own events. However, if attendees have already booked, consider the impact before deletion.
+
+Q: What if I need to change the event capacity?
+A: You can edit the event and update the capacity field. Note that reducing capacity below current bookings may cause issues.
+
+
+ACCOUNT & AUTHENTICATION
+
+Q: How do I register for an account?
+A: Click "Sign Up" or "Register" on the homepage, choose your role (Attendee or Organizer), and fill in your details including name, email, and password.
+
+Q: What should I do if I forget my password?
+A: Use the "Forgot Password" option on the login page. Enter your email address and follow the instructions sent to reset your password.
+
+Q: Can I update my account details?
+A: Yes, go to your Profile Settings to update your name, email, password, or other account information.
+
+Q: Can I switch my role from Attendee to Organizer?
+A: You may need to contact an Administrator or use the role request feature if available in the application.
+
+
+TECHNICAL & TROUBLESHOOTING
+
+Q: I can't log in. What should I do?
+A: First, check that you're using the correct email and password. Ensure your internet connection is stable. If the issue persists, use the "Forgot Password" option to reset your credentials.
+
+Q: My booking is not showing up. Why?
+A: Try refreshing the page. If it still doesn't appear, the booking may not have completed successfully. Check your email for a confirmation.
+
+Q: I'm seeing an error while creating an event.
+A: Ensure all required fields are filled correctly. Check that the event date/time is in the future and the capacity is a valid number.
+
+Q: Which browsers are supported?
+A: The platform works best on modern browsers including Chrome, Firefox, Safari, and Edge. Make sure your browser is up to date.
+
+Q: Is the platform mobile-friendly?
+A: Yes, the application has a responsive design that works well on mobile phones and tablets.
+
+
+ADMINISTRATOR FUNCTIONS
+
+Q: Can an administrator delete any event?
+A: Yes, administrators have full control over all events for moderation, safety, and compliance purposes.
+
+Q: How do administrators manage users?
+A: Through the admin dashboard, administrators can view all users, change user roles, suspend accounts, or remove users if necessary.
+
+
+GENERAL PLATFORM INFORMATION
+
+Q: Is this platform free to use?
+A: Yes, creating an account and browsing events is free. Some events may require payment for tickets, depending on the organizer.
+
+Q: How do I search for specific events?
+A: Use the search bar on the Events page. You can search by event name, category, location, or date. Filters are also available to narrow down results.
+
+Q: What types of events can be hosted?
+A: Any type of event can be hosted, including conferences, workshops, concerts, meetups, webinars, sports events, and more.
+
+Q: Are online/virtual events supported?
+A: Yes, organizers can specify if an event is online and provide virtual meeting links in the event details.
+
+
+BEST PRACTICES
+--------------
+- Always log in to access personalized features like booking and event management
+- Organizers should regularly check attendee lists and update event information
+- Attendees should cancel bookings they can't attend to free up capacity for others
+- Administrators should monitor events to ensure compliance with platform guidelines
+- Keep your account information up to date
+- Review event details carefully before booking
+- Set realistic capacity numbers when creating events
+
+
+POLICIES & GUIDELINES
+----------------------
+- Respect all users and maintain professional conduct
+- Event content must comply with platform guidelines
+- Organizers are responsible for the accuracy of their event information
+- Cancellation policies may vary by event - check before booking
+- The platform reserves the right to remove events or users that violate terms of service
+
+
+CONTACT & SUPPORT
+-----------------
+If you face technical issues, have questions not covered here, or need assistance, please:
+- Use the Help & Support section within the application
+- Contact the support team through the contact form
+- Check the FAQ section for common solutions
+
+For urgent issues or platform abuse, administrators can be reached through the admin contact system.
+
+
+IMPORTANT NOTES FOR CHATBOT
+----------------------------
+- Only answer questions related to this Event Management System
+- If a question is outside the scope of events, bookings, or this application, politely redirect users
+- Always be helpful, professional, and concise
+- If you don't know the answer, acknowledge it and suggest contacting support
+- Never make up features or information not mentioned in this knowledge base
+- Stay focused on helping users understand and use the Event Management System effectively
