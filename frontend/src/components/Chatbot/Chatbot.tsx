@@ -5,6 +5,18 @@ interface Message {
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
+    suggestions?: string[];
+}
+
+interface ConversationState {
+    intent?: 'booking' | 'search' | 'cancel' | 'info';
+    step?: string;
+    eventId?: string;
+    eventName?: string;
+    ticketTypeId?: string;
+    ticketTypeName?: string;
+    quantity?: number;
+    searchResults?: any[];
 }
 
 export const Chatbot: React.FC = () => {
@@ -12,12 +24,15 @@ export const Chatbot: React.FC = () => {
     const [messages, setMessages] = useState<Message[]>([
         {
             role: 'assistant',
-            content: 'Hello! I\'m your event assistant. How can I help you today?',
+            content: 'Hello! I\'m your event assistant. I can help you book tickets, search for events, and answer questions. What would you like to do?',
             timestamp: new Date(),
+            suggestions: ['Show me upcoming events', 'I want to book tickets', 'How do I cancel a booking?'],
         },
     ]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [conversationState, setConversationState] = useState<ConversationState | null>(null);
+    const [conversationHistory, setConversationHistory] = useState<{ role: string; message: string }[]>([]);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () => {
@@ -28,12 +43,17 @@ export const Chatbot: React.FC = () => {
         scrollToBottom();
     }, [messages]);
 
-    const sendMessage = async () => {
-        if (!input.trim() || isLoading) return;
+    const getAuthToken = (): string | null => {
+        return localStorage.getItem('token');
+    };
+
+    const sendMessage = async (messageText?: string) => {
+        const msgToSend = messageText || input;
+        if (!msgToSend.trim() || isLoading) return;
 
         const userMessage: Message = {
             role: 'user',
-            content: input,
+            content: msgToSend,
             timestamp: new Date(),
         };
 
@@ -41,13 +61,29 @@ export const Chatbot: React.FC = () => {
         setInput('');
         setIsLoading(true);
 
+        // Update conversation history
+        const newHistory = [...conversationHistory, { role: 'user', message: msgToSend }];
+        setConversationHistory(newHistory);
+
         try {
+            const headers: Record<string, string> = {
+                'Content-Type': 'application/json',
+            };
+
+            // Add auth token if available
+            const token = getAuthToken();
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+            }
+
             const response = await fetch('/api/chatbot/chat', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ message: input }),
+                headers,
+                body: JSON.stringify({
+                    message: msgToSend,
+                    conversationHistory: newHistory,
+                    conversationState,
+                }),
             });
 
             if (!response.ok) {
@@ -56,13 +92,23 @@ export const Chatbot: React.FC = () => {
 
             const data = await response.json();
 
+            // Update conversation state if provided
+            if (data.conversationState) {
+                setConversationState(data.conversationState);
+            }
+
             const assistantMessage: Message = {
                 role: 'assistant',
-                content: data.response,
+                content: data.message,
                 timestamp: new Date(),
+                suggestions: data.suggestions,
             };
 
             setMessages((prev) => [...prev, assistantMessage]);
+
+            // Update conversation history with assistant response
+            setConversationHistory([...newHistory, { role: 'assistant', message: data.message }]);
+
         } catch (error) {
             const errorMessage: Message = {
                 role: 'assistant',
@@ -73,6 +119,10 @@ export const Chatbot: React.FC = () => {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleSuggestionClick = (suggestion: string) => {
+        sendMessage(suggestion);
     };
 
     const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -153,26 +203,23 @@ export const Chatbot: React.FC = () => {
                             }`}
                     >
                         <div className="message-content">
-                            {message.role === 'assistant' && isLoading && index === messages.length - 1 ? (
-                                <svg
-                                    className="spinner"
-                                    width="16"
-                                    height="16"
-                                    viewBox="0 0 24 24"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                >
-                                    <circle cx="12" cy="12" r="10" opacity="0.25" />
-                                    <path
-                                        d="M12 2a10 10 0 0 1 10 10"
-                                        opacity="0.75"
-                                    />
-                                </svg>
-                            ) : null}
                             {message.content}
                         </div>
                         <div className="message-timestamp">{formatTime(message.timestamp)}</div>
+                        {message.suggestions && message.suggestions.length > 0 && (
+                            <div className="message-suggestions">
+                                {message.suggestions.map((suggestion, idx) => (
+                                    <button
+                                        key={idx}
+                                        className="suggestion-btn"
+                                        onClick={() => handleSuggestionClick(suggestion)}
+                                        disabled={isLoading}
+                                    >
+                                        {suggestion}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 ))}
                 {isLoading && (
@@ -209,7 +256,7 @@ export const Chatbot: React.FC = () => {
                 />
                 <button
                     className="chatbot-send-btn"
-                    onClick={sendMessage}
+                    onClick={() => sendMessage()}
                     disabled={!input.trim() || isLoading}
                     aria-label="Send message"
                 >

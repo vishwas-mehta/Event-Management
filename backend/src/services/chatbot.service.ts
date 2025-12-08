@@ -59,28 +59,22 @@ export class ChatbotService {
             };
         }
 
-        // Try Gemini API first
-        try {
-            const systemPrompt = this.buildSystemPrompt();
-            const chatHistory = this.formatHistory(conversationHistory);
-            const fullPrompt = `${systemPrompt}\n\n${chatHistory}\n\nUser: ${userMessage}\nAssistant:`;
+        // Detect user intent
+        const intent = this.detectIntent(userMessage);
 
-            const result = await model.generateContent(fullPrompt);
-            const response = result.response.text();
-
-            // Security: Validate response is relevant
-            if (this.isResponseIrrelevant(response)) {
-                return {
-                    message: "I can only help with questions about the Event Management System. Please ask something related to events, bookings, or the application."
-                };
-            }
-            return { message: response };
-        } catch (error) {
-            console.error('Gemini API error, using knowledge base fallback:', error);
-            // Use knowledge-based fallback instead of throwing error
-            const fallbackMessage = this.getKnowledgeBasedResponse(userMessage);
-            return { message: fallbackMessage };
+        // Handle booking intent with multi-turn conversation
+        if (intent === 'booking') {
+            return await this.handleBookingIntent(userMessage, conversationState, userId);
         }
+
+        // Handle search intent
+        if (intent === 'search') {
+            return await this.handleSearchIntent(userMessage, userId);
+        }
+
+        // For general info/questions, use the fallback knowledge base response
+        const fallbackMessage = this.getKnowledgeBasedResponse(userMessage);
+        return { message: fallbackMessage };
     }
     private buildSystemPrompt(): string {
         return `You are a helpful assistant for an Event Management System. You can ONLY answer questions about this application.
@@ -194,5 +188,74 @@ Remember: You can ONLY discuss the Event Management System. Stay in character!`;
 
         // Default response
         return 'I can help you with questions about booking events, creating events, managing your account, and using the Event Management System. Could you please ask a more specific question about events, bookings, or your account?';
+    }
+
+    /**
+     * Detect user intent from their message
+     */
+    private detectIntent(message: string): 'booking' | 'search' | 'cancel' | 'info' | null {
+        const lowerMessage = message.toLowerCase();
+
+        // Booking intent keywords
+        const bookingKeywords = ['book', 'buy ticket', 'purchase ticket', 'reserve', 'get ticket', 'i want to attend'];
+        const hasBookingIntent = bookingKeywords.some(keyword => lowerMessage.includes(keyword));
+
+        // Search intent keywords
+        const searchKeywords = ['find event', 'search event', 'show me event', 'list event', 'what events', 'any concerts', 'upcoming'];
+        const hasSearchIntent = searchKeywords.some(keyword => lowerMessage.includes(keyword));
+
+        // Cancel intent keywords
+        const cancelKeywords = ['cancel booking', 'cancel ticket', 'cancel my reservation'];
+        const hasCancelIntent = cancelKeywords.some(keyword => lowerMessage.includes(keyword));
+
+        // Prioritize intents: cancel > booking > search
+        if (hasCancelIntent) return 'cancel';
+        if (hasBookingIntent && !lowerMessage.includes('how')) return 'booking';  // Exclude "how to book" questions
+        if (hasSearchIntent) return 'search';
+
+        return 'info';  // Default to info/questions
+    }
+
+    /**
+     * Handle booking intent with multi-turn conversation
+     */
+    private async handleBookingIntent(
+        message: string,
+        state: ConversationState | null,
+        userId?: string
+    ): Promise<ChatbotResponse> {
+        // Check if user is authenticated
+        if (!userId) {
+            return {
+                message: "To book tickets, you need to be logged in. Please log in to your account and try again.",
+                suggestions: ["How do I create an account?", "What events are available?"]
+            };
+        }
+
+        // Initialize state if not present
+        const currentState: ConversationState = state || { intent: 'booking' };
+
+        // TODO: Implement full multi-turn booking flow in next phase
+        // For now, provide a helpful message
+        return {
+            message: "I'd love to help you book tickets! This feature is currently being enhanced. For now, please use the 'Events' page to browse and book tickets. Just click on any event and then click the 'Book Now' button.",
+            conversationState: currentState,
+            suggestions: ["Show me upcoming events", "What types of events are available?"]
+        };
+    }
+
+    /**
+     * Handle search intent - find events based on user query
+     */
+    private async handleSearchIntent(
+        message: string,
+        userId?: string
+    ): Promise<ChatbotResponse> {
+        // TODO: Implement actual event search using EventController/Repository in next phase
+        // For now, provide helpful guidance
+        return {
+            message: "I can help you find events! You can browse all available events on the Events page, or search by:\n• Event name or keyword\n• Category (concerts, sports, festivals, etc.)\n• Location\n• Date range\n\nWhat kind of event are you looking for?",
+            suggestions: ["Show me concerts", "Events this weekend", "Free events"]
+        };
     }
 }
