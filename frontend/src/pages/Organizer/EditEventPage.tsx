@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Form, Button, Alert, Tab, Tabs, Table, Modal } from 'react-bootstrap';
+import { Container, Row, Col, Card, Form, Button, Alert, Tab, Tabs, Table } from 'react-bootstrap';
 import { useNavigate, useParams } from 'react-router-dom';
 import { organizerApi } from '../../api/organizer.api';
 import { eventsApi } from '../../api/events.api';
@@ -14,6 +14,7 @@ const EditEventPage: React.FC = () => {
     const [categories, setCategories] = useState<CategoryType[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [event, setEvent] = useState<EventType | null>(null);
@@ -31,15 +32,6 @@ const EditEventPage: React.FC = () => {
         teaserVideo: '',
         isPublished: true,
     });
-
-    // Ticket type management
-    const [showTicketModal, setShowTicketModal] = useState(false);
-    const [ticketFormData, setTicketFormData] = useState({
-        name: '',
-        description: '',
-        capacity: 50,
-    });
-    const [ticketLoading, setTicketLoading] = useState(false);
 
     useEffect(() => {
         loadData();
@@ -110,7 +102,7 @@ const EditEventPage: React.FC = () => {
                 capacity: Number(formData.capacity),
             });
             setSuccess('Event updated successfully!');
-            loadData(); // Reload to get fresh data
+            loadData();
         } catch (err: any) {
             setError(extractErrorMessage(err, 'Failed to update event.'));
         } finally {
@@ -118,44 +110,20 @@ const EditEventPage: React.FC = () => {
         }
     };
 
-    const handleTicketChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { name, value } = e.target;
-        setTicketFormData({
-            ...ticketFormData,
-            [name]: name === 'capacity' ? parseInt(value) || 0 : value,
-        });
-    };
+    const handleDelete = async () => {
+        if (!window.confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
+            return;
+        }
 
-    const handleAddTicket = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setTicketLoading(true);
+        setDeleting(true);
         setError('');
 
         try {
-            await organizerApi.createTicketType(id!, {
-                ...ticketFormData,
-                price: 0, // All events are free
-            });
-            setShowTicketModal(false);
-            setTicketFormData({ name: '', description: '', capacity: 50 });
-            setSuccess('Ticket type added!');
-            loadData();
+            await organizerApi.deleteEvent(id!);
+            navigate('/organizer/dashboard');
         } catch (err) {
-            setError(extractErrorMessage(err, 'Failed to add ticket type'));
-        } finally {
-            setTicketLoading(false);
-        }
-    };
-
-    const handleDeleteTicket = async (ticketId: string) => {
-        if (!window.confirm('Delete this ticket type?')) return;
-
-        try {
-            await organizerApi.deleteTicketType(ticketId);
-            setSuccess('Ticket type deleted');
-            loadData();
-        } catch (err) {
-            setError(extractErrorMessage(err, 'Cannot delete ticket type with sold tickets'));
+            setError(extractErrorMessage(err, 'Failed to delete event. It may have existing bookings.'));
+            setDeleting(false);
         }
     };
 
@@ -166,9 +134,19 @@ const EditEventPage: React.FC = () => {
         <Container className="py-4">
             <div className="d-flex justify-content-between align-items-center mb-4">
                 <h2>Edit Event</h2>
-                <Button variant="secondary" onClick={() => navigate('/organizer/dashboard')}>
-                    Back to Dashboard
-                </Button>
+                <div>
+                    <Button
+                        variant="danger"
+                        className="me-2"
+                        onClick={handleDelete}
+                        disabled={deleting}
+                    >
+                        {deleting ? 'Deleting...' : 'Delete Event'}
+                    </Button>
+                    <Button variant="secondary" onClick={() => navigate('/organizer/dashboard')}>
+                        Back to Dashboard
+                    </Button>
+                </div>
             </div>
 
             {error && <ErrorAlert message={error} onClose={() => setError('')} />}
@@ -325,57 +303,6 @@ const EditEventPage: React.FC = () => {
                     </Card>
                 </Tab>
 
-                {/* Ticket Types Tab */}
-                <Tab eventKey="tickets" title="Ticket Types">
-                    <Card>
-                        <Card.Header className="d-flex justify-content-between align-items-center">
-                            <strong>Ticket Types</strong>
-                            <Button size="sm" onClick={() => setShowTicketModal(true)}>
-                                + Add Ticket Type
-                            </Button>
-                        </Card.Header>
-                        <Card.Body>
-                            {event.ticketTypes && event.ticketTypes.length > 0 ? (
-                                <Table responsive>
-                                    <thead>
-                                        <tr>
-                                            <th>Name</th>
-                                            <th>Description</th>
-                                            <th>Price</th>
-                                            <th>Capacity</th>
-                                            <th>Sold</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {event.ticketTypes.map((ticket) => (
-                                            <tr key={ticket.id}>
-                                                <td>{ticket.name}</td>
-                                                <td>{ticket.description || '-'}</td>
-                                                <td>Free</td>
-                                                <td>{ticket.capacity}</td>
-                                                <td>{ticket.sold}</td>
-                                                <td>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="danger"
-                                                        onClick={() => handleDeleteTicket(ticket.id)}
-                                                        disabled={ticket.sold > 0}
-                                                    >
-                                                        Delete
-                                                    </Button>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </Table>
-                            ) : (
-                                <p className="text-muted">No ticket types. Add one to allow bookings.</p>
-                            )}
-                        </Card.Body>
-                    </Card>
-                </Tab>
-
                 {/* Attendees Tab */}
                 <Tab eventKey="attendees" title="Attendees">
                     <Card>
@@ -413,59 +340,7 @@ const EditEventPage: React.FC = () => {
                     </Card>
                 </Tab>
             </Tabs>
-
-            {/* Add Ticket Modal */}
-            <Modal show={showTicketModal} onHide={() => setShowTicketModal(false)}>
-                <Modal.Header closeButton>
-                    <Modal.Title>Add Ticket Type</Modal.Title>
-                </Modal.Header>
-                <Form onSubmit={handleAddTicket}>
-                    <Modal.Body>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Ticket Name *</Form.Label>
-                            <Form.Control
-                                type="text"
-                                name="name"
-                                value={ticketFormData.name}
-                                onChange={handleTicketChange}
-                                placeholder="e.g., General Admission, VIP"
-                                required
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Description</Form.Label>
-                            <Form.Control
-                                as="textarea"
-                                name="description"
-                                value={ticketFormData.description}
-                                onChange={handleTicketChange}
-                                rows={2}
-                            />
-                        </Form.Group>
-                        <Form.Group className="mb-3">
-                            <Form.Label>Capacity *</Form.Label>
-                            <Form.Control
-                                type="number"
-                                name="capacity"
-                                value={ticketFormData.capacity}
-                                onChange={handleTicketChange}
-                                min="1"
-                                required
-                            />
-                        </Form.Group>
-                        <Alert variant="info">All events are free. Price is set to $0.</Alert>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowTicketModal(false)}>
-                            Cancel
-                        </Button>
-                        <Button variant="primary" type="submit" disabled={ticketLoading}>
-                            {ticketLoading ? 'Adding...' : 'Add Ticket'}
-                        </Button>
-                    </Modal.Footer>
-                </Form>
-            </Modal>
-        </Container>
+        </Container >
     );
 };
 
