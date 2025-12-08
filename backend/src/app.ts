@@ -13,6 +13,7 @@ import adminRoutes from './routes/admin.routes';
 import organizerRoutes from './routes/organizer.routes';
 import eventRoutes from './routes/event.routes';
 import attendeeRoutes from './routes/attendee.routes';
+import chatbotRoutes from './routes/chatbot.routes';
 
 // Middleware
 import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
@@ -52,6 +53,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/organizer', organizerRoutes);
 app.use('/api/events', eventRoutes);
 app.use('/api/attendee', attendeeRoutes);
+app.use('/api/chatbot', chatbotRoutes);
 
 // 404 handler
 app.use(notFoundHandler);
