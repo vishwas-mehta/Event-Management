@@ -1,11 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Chatbot.css';
+
+interface Action {
+    type: 'navigate' | 'link';
+    label: string;
+    target: string;
+}
 
 interface Message {
     role: 'user' | 'assistant';
     content: string;
     timestamp: Date;
     suggestions?: string[];
+    actions?: Action[];
 }
 
 interface ConversationState {
@@ -19,14 +27,44 @@ interface ConversationState {
     searchResults?: any[];
 }
 
+// Simple markdown-like text formatter
+const formatMessage = (text: string): React.ReactNode[] => {
+    const lines = text.split('\n');
+    const elements: React.ReactNode[] = [];
+
+    lines.forEach((line, lineIndex) => {
+        if (lineIndex > 0) {
+            elements.push(<br key={`br-${lineIndex}`} />);
+        }
+
+        // Process each line for inline formatting
+        const parts = line.split(/(\*\*[^*]+\*\*)/g);
+        parts.forEach((part, partIndex) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                // Bold text
+                elements.push(
+                    <strong key={`${lineIndex}-${partIndex}`}>
+                        {part.slice(2, -2)}
+                    </strong>
+                );
+            } else {
+                elements.push(<span key={`${lineIndex}-${partIndex}`}>{part}</span>);
+            }
+        });
+    });
+
+    return elements;
+};
+
 export const Chatbot: React.FC = () => {
+    const navigate = useNavigate();
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
         {
             role: 'assistant',
-            content: 'Hello! I\'m your event assistant. I can help you book tickets, search for events, and answer questions. What would you like to do?',
+            content: '👋 Hello! I\'m your event assistant.\n\nI can help you:\n• 🎫 Book tickets for events\n• 🔍 Search for upcoming events\n• ❓ Answer your questions\n\nWhat would you like to do?',
             timestamp: new Date(),
-            suggestions: ['Show me upcoming events', 'I want to book tickets', 'How do I cancel a booking?'],
+            suggestions: ['Show me events', 'Book tickets', 'Help'],
         },
     ]);
     const [input, setInput] = useState('');
@@ -47,6 +85,15 @@ export const Chatbot: React.FC = () => {
         return localStorage.getItem('token');
     };
 
+    const handleAction = (action: Action) => {
+        if (action.type === 'navigate') {
+            setIsOpen(false);
+            navigate(action.target);
+        } else if (action.type === 'link') {
+            window.open(action.target, '_blank');
+        }
+    };
+
     const sendMessage = async (messageText?: string) => {
         const msgToSend = messageText || input;
         if (!msgToSend.trim() || isLoading) return;
@@ -61,7 +108,6 @@ export const Chatbot: React.FC = () => {
         setInput('');
         setIsLoading(true);
 
-        // Update conversation history
         const newHistory = [...conversationHistory, { role: 'user', message: msgToSend }];
         setConversationHistory(newHistory);
 
@@ -70,7 +116,6 @@ export const Chatbot: React.FC = () => {
                 'Content-Type': 'application/json',
             };
 
-            // Add auth token if available
             const token = getAuthToken();
             if (token) {
                 headers['Authorization'] = `Bearer ${token}`;
@@ -92,9 +137,11 @@ export const Chatbot: React.FC = () => {
 
             const data = await response.json();
 
-            // Update conversation state if provided
             if (data.conversationState) {
                 setConversationState(data.conversationState);
+            } else if (!data.conversationState && conversationState) {
+                // Clear state if not in a flow
+                setConversationState(null);
             }
 
             const assistantMessage: Message = {
@@ -102,18 +149,18 @@ export const Chatbot: React.FC = () => {
                 content: data.message,
                 timestamp: new Date(),
                 suggestions: data.suggestions,
+                actions: data.actions,
             };
 
             setMessages((prev) => [...prev, assistantMessage]);
-
-            // Update conversation history with assistant response
             setConversationHistory([...newHistory, { role: 'assistant', message: data.message }]);
 
         } catch (error) {
             const errorMessage: Message = {
                 role: 'assistant',
-                content: 'Sorry, I encountered an error. Please try again later.',
+                content: '😔 Sorry, I encountered an error. Please try again.',
                 timestamp: new Date(),
+                suggestions: ['Try again', 'Help'],
             };
             setMessages((prev) => [...prev, errorMessage]);
         } finally {
@@ -137,6 +184,19 @@ export const Chatbot: React.FC = () => {
             hour: 'numeric',
             minute: '2-digit',
         });
+    };
+
+    const resetConversation = () => {
+        setMessages([
+            {
+                role: 'assistant',
+                content: '👋 Hello! I\'m your event assistant.\n\nI can help you:\n• 🎫 Book tickets for events\n• 🔍 Search for upcoming events\n• ❓ Answer your questions\n\nWhat would you like to do?',
+                timestamp: new Date(),
+                suggestions: ['Show me events', 'Book tickets', 'Help'],
+            },
+        ]);
+        setConversationState(null);
+        setConversationHistory([]);
     };
 
     if (!isOpen) {
@@ -176,36 +236,70 @@ export const Chatbot: React.FC = () => {
                     </svg>
                     Event Assistant
                 </div>
-                <button
-                    className="chatbot-close"
-                    onClick={() => setIsOpen(false)}
-                    aria-label="Close chatbot"
-                >
-                    <svg
-                        width="20"
-                        height="20"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2"
+                <div className="chatbot-header-actions">
+                    <button
+                        className="chatbot-reset"
+                        onClick={resetConversation}
+                        aria-label="Reset conversation"
+                        title="Start over"
                     >
-                        <line x1="18" y1="6" x2="6" y2="18" />
-                        <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                            <path d="M3 3v5h5" />
+                        </svg>
+                    </button>
+                    <button
+                        className="chatbot-close"
+                        onClick={() => setIsOpen(false)}
+                        aria-label="Close chatbot"
+                    >
+                        <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                        >
+                            <line x1="18" y1="6" x2="6" y2="18" />
+                            <line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                    </button>
+                </div>
             </div>
 
             <div className="chatbot-messages">
                 {messages.map((message, index) => (
                     <div
                         key={index}
-                        className={`message ${message.role === 'user' ? 'message-user' : 'message-assistant'
-                            }`}
+                        className={`message ${message.role === 'user' ? 'message-user' : 'message-assistant'}`}
                     >
                         <div className="message-content">
-                            {message.content}
+                            {formatMessage(message.content)}
                         </div>
                         <div className="message-timestamp">{formatTime(message.timestamp)}</div>
+
+                        {/* Action buttons (like "Go to Sign In") */}
+                        {message.actions && message.actions.length > 0 && (
+                            <div className="message-actions">
+                                {message.actions.map((action, idx) => (
+                                    <button
+                                        key={idx}
+                                        className="action-btn"
+                                        onClick={() => handleAction(action)}
+                                    >
+                                        {action.type === 'navigate' && (
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                <path d="M5 12h14M12 5l7 7-7 7" />
+                                            </svg>
+                                        )}
+                                        {action.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {/* Suggestion chips */}
                         {message.suggestions && message.suggestions.length > 0 && (
                             <div className="message-suggestions">
                                 {message.suggestions.map((suggestion, idx) => (
@@ -224,20 +318,10 @@ export const Chatbot: React.FC = () => {
                 ))}
                 {isLoading && (
                     <div className="message message-assistant">
-                        <div className="message-content">
-                            <svg
-                                className="spinner"
-                                width="16"
-                                height="16"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                            >
-                                <circle cx="12" cy="12" r="10" opacity="0.25" />
-                                <path d="M12 2a10 10 0 0 1 10 10" opacity="0.75" />
-                            </svg>
-                            Thinking...
+                        <div className="message-content typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
                         </div>
                     </div>
                 )}
