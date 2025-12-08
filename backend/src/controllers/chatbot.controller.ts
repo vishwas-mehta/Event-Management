@@ -4,14 +4,25 @@ const chatbotService = new ChatbotService();
 export class ChatbotController {
     async chat(req: Request, res: Response) {
         try {
-            const { message, conversationHistory } = req.body;
+            const { message, conversationHistory, conversationState } = req.body;
+
             if (!message) {
                 return res.status(400).json({ error: 'Message is required' });
             }
-            const response = await chatbotService.chat(message, conversationHistory);
+
+            // Get userId from auth if available (optional authentication)
+            const userId = req.user?.userId;
+
+            const response = await chatbotService.chat(
+                message,
+                conversationHistory || [],
+                conversationState,
+                userId
+            );
+
             return res.status(200).json({
                 success: true,
-                response,
+                ...response,
                 timestamp: new Date().toISOString()
             });
         } catch (error: any) {

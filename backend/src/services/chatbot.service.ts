@@ -1,8 +1,35 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import fs from 'fs';
 import path from 'path';
+
+// Interfaces for conversation state and responses
+interface ConversationState {
+    intent?: 'booking' | 'search' | 'cancel' | 'info';
+    step?: string;
+    eventId?: string;
+    eventName?: string;
+    ticketTypeId?: string;
+    ticketTypeName?: string;
+    quantity?: number;
+    searchResults?: any[];
+}
+
+interface ChatbotAction {
+    type: 'book_ticket' | 'search_events' | 'show_event_details';
+    data: any;
+    requiresAuth: boolean;
+}
+
+interface ChatbotResponse {
+    message: string;
+    action?: ChatbotAction;
+    conversationState?: ConversationState;
+    suggestions?: string[];
+}
+
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+
 export class ChatbotService {
     private knowledgeBase: string;
 
@@ -11,7 +38,13 @@ export class ChatbotService {
         const knowledgePath = path.join(__dirname, '../knowledge/chatbot_knowledge.txt');
         this.knowledgeBase = fs.readFileSync(knowledgePath, 'utf-8');
     }
-    async chat(userMessage: string, conversationHistory: any[] = []): Promise<string> {
+
+    async chat(
+        userMessage: string,
+        conversationHistory: any[] = [],
+        conversationState: ConversationState | null = null,
+        userId?: string
+    ): Promise<ChatbotResponse> {
         // Security: Input validation
         if (!userMessage || userMessage.trim().length === 0) {
             throw new Error('Message cannot be empty');
@@ -21,7 +54,9 @@ export class ChatbotService {
         }
         // Security: Check for prompt injection attempts
         if (this.containsPromptInjection(userMessage)) {
-            return "I can only answer questions about the Event Management System. Please ask a relevant question.";
+            return {
+                message: "I can only answer questions about the Event Management System. Please ask a relevant question."
+            };
         }
 
         // Try Gemini API first
@@ -35,13 +70,16 @@ export class ChatbotService {
 
             // Security: Validate response is relevant
             if (this.isResponseIrrelevant(response)) {
-                return "I can only help with questions about the Event Management System. Please ask something related to events, bookings, or the application.";
+                return {
+                    message: "I can only help with questions about the Event Management System. Please ask something related to events, bookings, or the application."
+                };
             }
-            return response;
+            return { message: response };
         } catch (error) {
             console.error('Gemini API error, using knowledge base fallback:', error);
             // Use knowledge-based fallback instead of throwing error
-            return this.getKnowledgeBasedResponse(userMessage);
+            const fallbackMessage = this.getKnowledgeBasedResponse(userMessage);
+            return { message: fallbackMessage };
         }
     }
     private buildSystemPrompt(): string {
