@@ -82,19 +82,11 @@ const OrganizerDashboard: React.FC = () => {
                                         <div className="d-flex gap-2">
                                             <Button
                                                 as={Link}
-                                                to={`/organizer/events/${event.id}/manage`}
+                                                to={`/organizer/events/${event.id}/edit`}
                                                 variant="primary"
                                                 size="sm"
                                             >
                                                 Manage
-                                            </Button>
-                                            <Button
-                                                as={Link}
-                                                to={`/organizer/events/${event.id}/edit`}
-                                                variant="outline-secondary"
-                                                size="sm"
-                                            >
-                                                Edit
                                             </Button>
                                         </div>
                                     </div>
