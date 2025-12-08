@@ -173,16 +173,17 @@ export class OrganizerController {
             throw new NotFoundError('Event not found or you do not have permission');
         }
 
-        // Check if there are any bookings - prevent deletion if so
-        if (event.bookings && event.bookings.length > 0) {
-            throw new ValidationError('Cannot delete event with existing bookings. Please cancel all bookings first.');
-        }
-
-        // Delete ticket types first, then the event
+        // Delete all related records in a transaction
         await AppDataSource.transaction(async (manager) => {
+            // Delete bookings first
+            if (event.bookings && event.bookings.length > 0) {
+                await manager.remove(event.bookings);
+            }
+            // Delete ticket types
             if (event.ticketTypes && event.ticketTypes.length > 0) {
                 await manager.remove(event.ticketTypes);
             }
+            // Finally delete the event
             await manager.remove(event);
         });
 
