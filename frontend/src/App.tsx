@@ -29,7 +29,7 @@ import AttendeeDashboard from './pages/Attendee/AttendeeDashboard';
 import MyBookingsPage from './pages/Attendee/MyBookingsPage';
 
 // Chatbot
-import Chatbot from './components/Chatbot/Chatbot';
+import { Chatbot } from './components/Chatbot/Chatbot';
 
 const AppRoutes: React.FC = () => {
   return (
@@ -158,6 +158,7 @@ const App: React.FC = () => {
     <BrowserRouter>
       <AuthProvider>
         <AppRoutes />
+        <Chatbot />
       </AuthProvider>
     </BrowserRouter>
   );
