@@ -41,7 +41,7 @@ const OrganizerDashboard: React.FC = () => {
                 <Col md={4}>
                     <Card className="stat-card">
                         <Card.Body>
-                            <h3>{stats?.totalEvents || 0}</h3>
+                            <h3>{stats?.stats?.totalEvents || 0}</h3>
                             <p className="text-muted mb-0">Total Events</p>
                         </Card.Body>
                     </Card>
@@ -49,7 +49,7 @@ const OrganizerDashboard: React.FC = () => {
                 <Col md={4}>
                     <Card className="stat-card">
                         <Card.Body>
-                            <h3>{stats?.totalBookings || 0}</h3>
+                            <h3>{stats?.stats?.totalBookings || 0}</h3>
                             <p className="text-muted mb-0">Total Bookings</p>
                         </Card.Body>
                     </Card>
@@ -57,7 +57,7 @@ const OrganizerDashboard: React.FC = () => {
                 <Col md={4}>
                     <Card className="stat-card">
                         <Card.Body>
-                            <h3>{stats?.upcomingEvents || 0}</h3>
+                            <h3>{stats?.stats?.upcomingEvents || 0}</h3>
                             <p className="text-muted mb-0">Upcoming Events</p>
                         </Card.Body>
                     </Card>

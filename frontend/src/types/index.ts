@@ -223,9 +223,11 @@ export interface AuthContextType {
 
 // Dashboard Stats
 export interface OrganizerDashboardStats {
-    totalEvents: number;
-    totalBookings: number;
-    upcomingEvents: number;
+    stats: {
+        totalEvents: number;
+        totalBookings: number;
+        upcomingEvents: number;
+    };
     events: EventType[];
 }
 

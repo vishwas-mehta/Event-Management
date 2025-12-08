@@ -19,6 +19,7 @@ const EditEventPage: React.FC = () => {
     const [success, setSuccess] = useState('');
     const [event, setEvent] = useState<EventType | null>(null);
     const [attendees, setAttendees] = useState<any[]>([]);
+    const [creatingTicket, setCreatingTicket] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -127,6 +128,25 @@ const EditEventPage: React.FC = () => {
         }
     };
 
+    const handleCreateDefaultTicket = async () => {
+        setCreatingTicket(true);
+        setError('');
+        try {
+            await organizerApi.createTicketType(id!, {
+                name: 'General Admission',
+                description: 'Standard entry ticket',
+                price: 0,
+                capacity: formData.capacity || 100,
+            });
+            setSuccess('Ticket type created! Users can now book this event.');
+            loadData();
+        } catch (err) {
+            setError(extractErrorMessage(err, 'Failed to create ticket type'));
+        } finally {
+            setCreatingTicket(false);
+        }
+    };
+
     if (loading) return <LoadingSpinner />;
     if (!event) return <Container className="py-4"><Alert variant="danger">Event not found</Alert></Container>;
 
@@ -153,6 +173,21 @@ const EditEventPage: React.FC = () => {
             {success && <Alert variant="success" dismissible onClose={() => setSuccess('')}>{success}</Alert>}
 
             <Tabs defaultActiveKey="details" className="mb-4">
+                {/* Warning if no ticket types */}
+                {(!event.ticketTypes || event.ticketTypes.length === 0) && (
+                    <Alert variant="warning" className="mb-3">
+                        <strong>⚠️ No ticket types!</strong> This event cannot accept bookings.{' '}
+                        <Button
+                            variant="warning"
+                            size="sm"
+                            onClick={handleCreateDefaultTicket}
+                            disabled={creatingTicket}
+                        >
+                            {creatingTicket ? 'Creating...' : 'Create Default Ticket'}
+                        </Button>
+                    </Alert>
+                )}
+
                 {/* Event Details Tab */}
                 <Tab eventKey="details" title="Event Details">
                     <Card>
