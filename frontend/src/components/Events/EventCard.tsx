@@ -28,12 +28,26 @@ const EventCard: React.FC<EventCardProps> = ({ event }) => {
     return (
         <Link to={`/events/${event.id}`} className="text-decoration-none">
             <Card className="event-card h-100">
-                <div style={{ position: 'relative', overflow: 'hidden', background: '#f3f4f6' }}>
-                    <Card.Img
-                        variant="top"
+                {/* Responsive 16:9 Image Container */}
+                <div style={{
+                    position: 'relative',
+                    width: '100%',
+                    paddingTop: '56.25%', // 16:9 aspect ratio
+                    overflow: 'hidden',
+                    background: '#f3f4f6'
+                }}>
+                    <img
                         src={event.bannerImage || `https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=350&fit=crop&q=80`}
                         alt={event.title}
-                        className="event-card-image"
+                        style={{
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover',
+                            objectPosition: 'center',
+                        }}
                         onError={(e) => {
                             e.currentTarget.src = 'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&h=350&fit=crop&q=80';
                         }}

@@ -8,6 +8,7 @@ import type { EventType, TicketType } from '../../types';
 import { UserRole } from '../../types';
 import { formatEventDateTime } from '../../utils/dateFormat';
 import { extractErrorMessage } from '../../utils/errorHelper';
+import { isYouTubeUrl, getYouTubeVideoId, getYouTubeEmbedUrl } from '../../utils/mediaHelper';
 import { formatPrice } from '../../utils/priceFormat';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ErrorAlert from '../../components/Common/ErrorAlert';
@@ -101,14 +102,47 @@ const EventDetailsPage: React.FC = () => {
                 </Alert>
             )}
 
-            {/* Event Banner */}
+            {/* Event Banner - Image or YouTube Video */}
             {event.bannerImage && (
-                <img
-                    src={event.bannerImage}
-                    alt={event.title}
-                    className="w-100 rounded mb-4"
-                    style={{ maxHeight: '400px', objectFit: 'cover' }}
-                />
+                <div className="mb-4">
+                    {isYouTubeUrl(event.bannerImage) ? (
+                        /* YouTube Video Embed */
+                        <div style={{
+                            position: 'relative',
+                            paddingTop: '56.25%', // 16:9 aspect ratio
+                            borderRadius: '0.375rem',
+                            overflow: 'hidden',
+                            background: '#000'
+                        }}>
+                            <iframe
+                                style={{
+                                    position: 'absolute',
+                                    top: 0,
+                                    left: 0,
+                                    width: '100%',
+                                    height: '100%',
+                                    border: 'none'
+                                }}
+                                src={getYouTubeEmbedUrl(getYouTubeVideoId(event.bannerImage)!)}
+                                title={event.title}
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                            />
+                        </div>
+                    ) : (
+                        /* Regular Image */
+                        <img
+                            src={event.bannerImage}
+                            alt={event.title}
+                            className="w-100 rounded"
+                            style={{
+                                maxHeight: '500px',
+                                objectFit: 'cover',
+                                objectPosition: 'center'
+                            }}
+                        />
+                    )}
+                </div>
             )}
 
             <Row>
