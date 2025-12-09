@@ -242,58 +242,92 @@ const EventDetailsPage: React.FC = () => {
                         <Card.Header><strong>Tickets</strong></Card.Header>
                         <Card.Body>
                             {event.ticketTypes && event.ticketTypes.length > 0 ? (
-                                event.ticketTypes.map((ticket) => (
-                                    <Card key={ticket.id} className="mb-3">
-                                        <Card.Body>
-                                            <div className="d-flex justify-content-between align-items-start mb-2">
-                                                <div>
-                                                    <h6>{ticket.name}</h6>
-                                                    {ticket.description && (
-                                                        <small className="text-muted">{ticket.description}</small>
+                                event.ticketTypes.map((ticket) => {
+                                    // Check for early bird pricing
+                                    const dp = ticket.dynamicPricing as any;
+                                    const hasEarlyBird = dp?.type === 'early_bird' && dp?.earlyBirdQuantity !== undefined;
+                                    const earlyBirdRemaining = hasEarlyBird ? Math.max(0, dp.earlyBirdQuantity - ticket.sold) : 0;
+                                    const isEarlyBirdActive = hasEarlyBird && earlyBirdRemaining > 0;
+                                    const currentPrice = isEarlyBirdActive ? (dp.earlyBirdPrice || ticket.price) : (dp?.originalPrice || ticket.price);
+                                    const regularPrice = dp?.originalPrice || ticket.price;
+
+                                    return (
+                                        <Card key={ticket.id} className={`mb-3 ${isEarlyBirdActive ? 'border-warning' : ''}`}>
+                                            <Card.Body>
+                                                <div className="d-flex justify-content-between align-items-start mb-2">
+                                                    <div>
+                                                        <h6>{ticket.name}</h6>
+                                                        {ticket.description && (
+                                                            <small className="text-muted">{ticket.description}</small>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-end">
+                                                        {isEarlyBirdActive ? (
+                                                            <>
+                                                                <Badge bg="warning" className="mb-1">🐦 EARLY BIRD</Badge>
+                                                                <div>
+                                                                    <strong className="text-success">{formatPrice(currentPrice)}</strong>
+                                                                    <small className="text-muted text-decoration-line-through ms-2">
+                                                                        {formatPrice(regularPrice)}
+                                                                    </small>
+                                                                </div>
+                                                            </>
+                                                        ) : (
+                                                            <Badge bg={Number(currentPrice) === 0 ? 'success' : 'primary'}>
+                                                                {formatPrice(currentPrice)}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                </div>
+
+                                                <div className="mb-2">
+                                                    <small>
+                                                        Available: {ticket.capacity - ticket.sold} / {ticket.capacity}
+                                                    </small>
+                                                    {isEarlyBirdActive && (
+                                                        <small className="d-block text-warning">
+                                                            ⚡ {earlyBirdRemaining} early bird ticket{earlyBirdRemaining !== 1 ? 's' : ''} left!
+                                                        </small>
+                                                    )}
+                                                    {hasEarlyBird && !isEarlyBirdActive && (
+                                                        <small className="d-block text-muted">
+                                                            Early bird sold out
+                                                        </small>
                                                     )}
                                                 </div>
-                                                <Badge bg={ticket.price === 0 ? 'success' : 'primary'}>
-                                                    {formatPrice(ticket.price)}
-                                                </Badge>
-                                            </div>
 
-                                            <div className="mb-2">
-                                                <small>
-                                                    Available: {ticket.capacity - ticket.sold} / {ticket.capacity}
-                                                </small>
-                                            </div>
-
-                                            {user?.role === UserRole.ATTENDEE ? (
-                                                ticket.capacity - ticket.sold > 0 ? (
+                                                {user?.role === UserRole.ATTENDEE ? (
+                                                    ticket.capacity - ticket.sold > 0 ? (
+                                                        <Button
+                                                            variant={isEarlyBirdActive ? "warning" : "primary"}
+                                                            size="sm"
+                                                            className="w-100"
+                                                            onClick={() => handleBookTicket(ticket)}
+                                                        >
+                                                            {isEarlyBirdActive ? `Book Now at ${formatPrice(currentPrice)}` : 'Book Now'}
+                                                        </Button>
+                                                    ) : (
+                                                        <Button variant="secondary" size="sm" className="w-100" disabled>
+                                                            Sold Out
+                                                        </Button>
+                                                    )
+                                                ) : !user ? (
                                                     <Button
                                                         variant="primary"
                                                         size="sm"
                                                         className="w-100"
-                                                        onClick={() => handleBookTicket(ticket)}
+                                                        as={Link}
+                                                        to="/login"
                                                     >
-                                                        Book Now
+                                                        Login to Book
                                                     </Button>
                                                 ) : (
-                                                    <Button variant="secondary" size="sm" className="w-100" disabled>
-                                                        Sold Out
-                                                    </Button>
-                                                )
-                                            ) : !user ? (
-                                                <Button
-                                                    variant="primary"
-                                                    size="sm"
-                                                    className="w-100"
-                                                    as={Link}
-                                                    to="/login"
-                                                >
-                                                    Login to Book
-                                                </Button>
-                                            ) : (
-                                                <small className="text-muted">Attendees only</small>
-                                            )}
-                                        </Card.Body>
-                                    </Card>
-                                ))
+                                                    <small className="text-muted">Attendees only</small>
+                                                )}
+                                            </Card.Body>
+                                        </Card>
+                                    )
+                                })
                             ) : (
                                 <p className="text-muted">No tickets available yet.</p>
                             )}
