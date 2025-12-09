@@ -61,6 +61,16 @@ export const organizerApi = {
         return response.data;
     },
 
+    // Update ticket type
+    updateTicketType: async (
+        eventId: string,
+        ticketTypeId: string,
+        data: Partial<TicketTypeFormData>
+    ): Promise<ApiResponse<{ ticketType: TicketType }>> => {
+        const response = await api.put(`/organizer/events/${eventId}/ticket-types/${ticketTypeId}`, data);
+        return response.data;
+    },
+
     // Delete ticket type
     deleteTicketType: async (ticketId: string): Promise<ApiResponse<{ message: string }>> => {
         const response = await api.delete(`/organizer/ticket-types/${ticketId}`);
