@@ -14,6 +14,7 @@ import {
     ValidationError,
     ConflictError,
 } from '../utils/AppError';
+import cacheService, { CacheKeys } from '../services/cache.service';
 
 export class AttendeeController {
     private ticketTypeRepository: Repository<TicketType>;
@@ -162,6 +163,9 @@ export class AttendeeController {
             return newBooking;
         });
 
+        // Invalidate event cache (ticket counts changed)
+        await cacheService.del(CacheKeys.EVENT_SINGLE + eventId);
+
         return sendSuccess(res, { booking }, 'Ticket booked successfully', 201);
     });
 
@@ -255,8 +259,12 @@ export class AttendeeController {
             return {
                 message: 'Booking cancelled successfully',
                 waitlistNotified: waitlistUsers.length,
+                eventId: booking.eventId,
             };
         });
+
+        // Invalidate event cache (ticket counts changed)
+        await cacheService.del(CacheKeys.EVENT_SINGLE + result.eventId);
 
         return sendSuccess(res, result, result.message);
     });

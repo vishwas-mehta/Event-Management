@@ -7,6 +7,7 @@ import { Category } from '../entities/Category.entity';
 import { TicketType } from '../entities/TicketType.entity';
 import { AppDataSource } from '../config/database';
 import { NotFoundError, ForbiddenError, ValidationError } from '../utils/AppError';
+import cacheService, { CacheKeys } from '../services/cache.service';
 
 export class OrganizerController {
     private eventRepository: Repository<Event>;
@@ -129,11 +130,13 @@ export class OrganizerController {
             );
         }
 
-        // Load relations
         const createdEvent = await this.eventRepository.findOne({
             where: { id: newEvent.id },
             relations: ['category', 'organizer', 'ticketTypes'],
         });
+
+        // Invalidate events list cache
+        await cacheService.delByPattern(CacheKeys.EVENTS_LIST + '*');
 
         return sendSuccess(res, { event: createdEvent }, 'Event created successfully', 201);
     });
@@ -196,6 +199,10 @@ export class OrganizerController {
             relations: ['category', 'ticketTypes'],
         });
 
+        // Invalidate caches
+        await cacheService.del(CacheKeys.EVENT_SINGLE + id);
+        await cacheService.delByPattern(CacheKeys.EVENTS_LIST + '*');
+
         return sendSuccess(res, { event: updatedEvent }, 'Event updated successfully');
     });
 
@@ -225,6 +232,10 @@ export class OrganizerController {
             // Finally delete the event
             await manager.remove(event);
         });
+
+        // Invalidate caches
+        await cacheService.del(CacheKeys.EVENT_SINGLE + id);
+        await cacheService.delByPattern(CacheKeys.EVENTS_LIST + '*');
 
         return sendSuccess(res, { message: 'Event deleted successfully' }, 'Event deleted successfully');
     });
