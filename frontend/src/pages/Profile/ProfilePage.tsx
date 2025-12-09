@@ -6,7 +6,7 @@ import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import { extractErrorMessage } from '../../utils/errorHelper';
 
 const ProfilePage: React.FC = () => {
-    const { user, setUser } = useAuth();
+    const { user, updateUser } = useAuth();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
@@ -42,7 +42,7 @@ const ProfilePage: React.FC = () => {
 
         try {
             const response = await authApi.updateProfile(formData);
-            setUser(response.data.user);
+            updateUser(response.data.user);
             setSuccess('Profile updated successfully!');
         } catch (err) {
             setError(extractErrorMessage(err, 'Failed to update profile'));

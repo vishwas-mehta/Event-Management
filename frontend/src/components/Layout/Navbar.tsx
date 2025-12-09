@@ -83,6 +83,9 @@ const Navbar: React.FC = () => {
                                         </div>
                                     </NavDropdown.ItemText>
                                     <NavDropdown.Divider />
+                                    <NavDropdown.Item as={Link} to="/profile">
+                                        Edit Profile
+                                    </NavDropdown.Item>
                                     <NavDropdown.Item onClick={handleLogout} className="text-danger">
                                         Logout
                                     </NavDropdown.Item>

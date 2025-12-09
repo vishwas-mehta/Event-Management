@@ -28,6 +28,9 @@ import ManageEventPage from './pages/Organizer/ManageEventPage';
 import AttendeeDashboard from './pages/Attendee/AttendeeDashboard';
 import MyBookingsPage from './pages/Attendee/MyBookingsPage';
 
+// Common Pages
+import ProfilePage from './pages/Profile/ProfilePage';
+
 // Chatbot
 import { Chatbot } from './components/Chatbot/Chatbot';
 
@@ -142,6 +145,18 @@ const AppRoutes: React.FC = () => {
           <MainLayout>
             <ProtectedRoute allowedRoles={[UserRole.ATTENDEE]}>
               <MyBookingsPage />
+            </ProtectedRoute>
+          </MainLayout>
+        }
+      />
+
+      {/* Profile Route - All authenticated users */}
+      <Route
+        path="/profile"
+        element={
+          <MainLayout>
+            <ProtectedRoute allowedRoles={[UserRole.ADMIN, UserRole.ORGANIZER, UserRole.ATTENDEE]}>
+              <ProfilePage />
             </ProtectedRoute>
           </MainLayout>
         }
