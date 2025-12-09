@@ -297,12 +297,12 @@ export class OrganizerController {
     });
 
     updateTicketType = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
+        const { ticketTypeId } = req.params;
         const organizerId = req.user!.userId;
         const updateData = req.body;
 
         const ticketType = await this.ticketTypeRepository.findOne({
-            where: { id },
+            where: { id: ticketTypeId },
             relations: ['event'],
         });
 
@@ -321,10 +321,7 @@ export class OrganizerController {
             );
         }
 
-        // Ensure price stays at 0 (all events are free)
-        if (updateData.price !== undefined) {
-            updateData.price = 0;
-        }
+        // Allow price updates (for paid tickets)
 
         Object.assign(ticketType, updateData);
         await this.ticketTypeRepository.save(ticketType);
@@ -333,11 +330,11 @@ export class OrganizerController {
     });
 
     deleteTicketType = asyncHandler(async (req: Request, res: Response) => {
-        const { id } = req.params;
+        const { ticketTypeId } = req.params;
         const organizerId = req.user!.userId;
 
         const ticketType = await this.ticketTypeRepository.findOne({
-            where: { id },
+            where: { id: ticketTypeId },
             relations: ['event'],
         });
 

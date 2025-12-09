@@ -72,8 +72,8 @@ export const organizerApi = {
     },
 
     // Delete ticket type
-    deleteTicketType: async (ticketId: string): Promise<ApiResponse<{ message: string }>> => {
-        const response = await api.delete(`/organizer/ticket-types/${ticketId}`);
+    deleteTicketType: async (eventId: string, ticketTypeId: string): Promise<ApiResponse<{ message: string }>> => {
+        const response = await api.delete(`/organizer/events/${eventId}/ticket-types/${ticketTypeId}`);
         return response.data;
     },
 

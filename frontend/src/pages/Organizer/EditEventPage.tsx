@@ -221,7 +221,7 @@ const EditEventPage: React.FC = () => {
         }
 
         try {
-            await organizerApi.deleteTicketType(ticketId);
+            await organizerApi.deleteTicketType(id!, ticketId);
             setSuccess('Ticket type deleted');
             loadData();
         } catch (err) {
