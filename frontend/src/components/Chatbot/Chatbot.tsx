@@ -238,6 +238,7 @@ export const Chatbot: React.FC = () => {
                 </div>
                 <div className="chatbot-header-actions">
                     <button
+                        type="button"
                         className="chatbot-reset"
                         onClick={resetConversation}
                         aria-label="Reset conversation"
