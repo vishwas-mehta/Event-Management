@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { Repository } from 'typeorm';
+import crypto from 'crypto';
 import { asyncHandler } from '../utils/asyncHandler';
 import { sendSuccess } from '../utils/responseBuilder';
 import { Event } from '../entities/Event.entity';
@@ -7,6 +8,7 @@ import { Category } from '../entities/Category.entity';
 import { ReportedEvent } from '../entities/ReportedEvent.entity';
 import { AppDataSource } from '../config/database';
 import { NotFoundError, ValidationError } from '../utils/AppError';
+import cacheService, { CacheKeys } from '../services/cache.service';
 
 export interface EventFilters {
     search?: string;
@@ -134,6 +136,15 @@ export class EventController {
         const skip = (page - 1) * limit;
         query.skip(skip).take(limit);
 
+        // Create cache key from filters
+        const cacheKey = CacheKeys.EVENTS_LIST + crypto.createHash('md5').update(JSON.stringify(req.query)).digest('hex');
+
+        // Check cache first
+        const cached = await cacheService.get(cacheKey);
+        if (cached) {
+            return sendSuccess(res, cached, 'Events retrieved (cached)');
+        }
+
         const [events, total] = await query.getManyAndCount();
 
         const result = {
@@ -146,11 +157,21 @@ export class EventController {
             },
         };
 
+        // Store in cache for 60 seconds
+        await cacheService.set(cacheKey, result, 60);
+
         return sendSuccess(res, result, 'Events retrieved successfully');
     });
 
     getEventById = asyncHandler(async (req: Request, res: Response) => {
         const { id } = req.params;
+        const cacheKey = CacheKeys.EVENT_SINGLE + id;
+
+        // Check cache first
+        const cached = await cacheService.get(cacheKey);
+        if (cached) {
+            return sendSuccess(res, cached, 'Event details retrieved (cached)');
+        }
 
         const event = await this.eventRepository.findOne({
             where: { id, isPublished: true },
@@ -173,13 +194,25 @@ export class EventController {
             totalReviews: event.reviews.length,
         };
 
+        // Cache for 2 minutes
+        await cacheService.set(cacheKey, { event: eventData }, 120);
+
         return sendSuccess(res, { event: eventData }, 'Event details retrieved');
     });
 
     getCategories = asyncHandler(async (req: Request, res: Response) => {
+        // Check cache first
+        const cached = await cacheService.get(CacheKeys.CATEGORIES);
+        if (cached) {
+            return sendSuccess(res, cached, 'Categories retrieved (cached)');
+        }
+
         const categories = await this.categoryRepository.find({
             order: { name: 'ASC' },
         });
+
+        // Cache for 1 hour (categories rarely change)
+        await cacheService.set(CacheKeys.CATEGORIES, { categories }, 3600);
 
         return sendSuccess(res, { categories }, 'Categories retrieved');
     });

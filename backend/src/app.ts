@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import env from './config/env';
 import { Request, Response, NextFunction } from 'express';
+import { connectRedis } from './config/redis';
 
 const express = require('express');
 const cors = require('cors');
@@ -32,6 +33,7 @@ app.use(
     // }
     // )
 );
+
 
 // Body parsing middleware
 app.use(express.json());
