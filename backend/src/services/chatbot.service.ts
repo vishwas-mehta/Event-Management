@@ -48,7 +48,8 @@ export class ChatbotService {
         userMessage: string,
         conversationHistory: any[] = [],
         conversationState: ConversationState | null = null,
-        userId?: string
+        userId?: string,
+        userRole?: string
     ): Promise<ChatbotResponse> {
         if (!userMessage || userMessage.trim().length === 0) {
             throw new Error('Message cannot be empty');
@@ -65,14 +66,14 @@ export class ChatbotService {
 
         // Check for active conversation state
         if (conversationState && conversationState.intent === 'booking' && conversationState.step) {
-            return await this.continueBookingFlow(userMessage, conversationState, userId);
+            return await this.continueBookingFlow(userMessage, conversationState, userId, userRole);
         }
 
         // Detect user intent
         const intent = this.detectIntent(userMessage);
 
         if (intent === 'booking') {
-            return await this.handleBookingIntent(userMessage, conversationState, userId);
+            return await this.handleBookingIntent(userMessage, conversationState, userId, userRole);
         }
 
         if (intent === 'search') {
@@ -175,7 +176,8 @@ export class ChatbotService {
     private async handleBookingIntent(
         message: string,
         state: ConversationState | null,
-        userId?: string
+        userId?: string,
+        userRole?: string
     ): Promise<ChatbotResponse> {
         if (!userId) {
             return {
@@ -185,6 +187,14 @@ export class ChatbotService {
                     { type: 'navigate', label: 'Sign In', target: '/login' },
                     { type: 'navigate', label: 'Create Account', target: '/register' }
                 ]
+            };
+        }
+
+        // Only attendees can book tickets
+        if (userRole && userRole !== 'attendee') {
+            return {
+                message: "⚠️ **Booking Not Available**\n\nOnly attendee accounts can book tickets.\n\nAdmins and Organizers cannot book tickets for events.",
+                suggestions: ['Show me events', 'Help']
             };
         }
 
@@ -262,7 +272,8 @@ export class ChatbotService {
     private async continueBookingFlow(
         message: string,
         state: ConversationState,
-        userId?: string
+        userId?: string,
+        userRole?: string
     ): Promise<ChatbotResponse> {
         if (!userId) {
             return {
@@ -270,6 +281,14 @@ export class ChatbotService {
                 actions: [
                     { type: 'navigate', label: 'Sign In', target: '/login' }
                 ]
+            };
+        }
+
+        // Only attendees can book tickets
+        if (userRole && userRole !== 'attendee') {
+            return {
+                message: "⚠️ **Booking Not Available**\n\nOnly attendee accounts can book tickets.\n\nAdmins and Organizers cannot book tickets for events.",
+                suggestions: ['Show me events', 'Help']
             };
         }
 

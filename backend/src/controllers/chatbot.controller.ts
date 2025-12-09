@@ -10,14 +10,16 @@ export class ChatbotController {
                 return res.status(400).json({ error: 'Message is required' });
             }
 
-            // Get userId from auth if available (optional authentication)
+            // Get userId and role from auth if available (optional authentication)
             const userId = req.user?.userId;
+            const userRole = req.user?.role;
 
             const response = await chatbotService.chat(
                 message,
                 conversationHistory || [],
                 conversationState,
-                userId
+                userId,
+                userRole
             );
 
             return res.status(200).json({
