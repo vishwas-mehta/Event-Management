@@ -24,7 +24,7 @@ export class OrganizerController {
 
         const events = await this.eventRepository.find({
             where: { organizerId },
-            relations: ['category', 'ticketTypes', 'bookings'],
+            relations: ['category', 'ticketTypes', 'bookings', 'reviews', 'reviews.user'],
             order: { createdAt: 'DESC' },
         });
 
