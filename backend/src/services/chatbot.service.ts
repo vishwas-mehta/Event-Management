@@ -534,26 +534,34 @@ export class ChatbotService {
         const lowerMessage = message.toLowerCase();
 
         // Greetings
-        if (['hello', 'hi', 'hey', 'hola', 'greetings'].some(g => lowerMessage.includes(g))) {
+        if (['hello', 'hi', 'hey', 'hola', 'greetings', 'good morning', 'good afternoon', 'good evening'].some(g => lowerMessage.includes(g))) {
             return {
-                message: "👋 Hello! I'm your event assistant.\n\nI can help you:\n• 🎫 Book tickets\n• 🔍 Find events\n• ❓ Answer questions\n\nWhat would you like to do?",
+                message: "👋 Hello! I'm your event assistant.\n\nI can help you:\n• 🎫 Book tickets\n• 🔍 Find events\n• ❓ Answer questions about the platform\n\nWhat would you like to do?",
                 suggestions: ['Show me events', 'Book tickets', 'Help']
             };
         }
 
-        // Help
-        if (['help', 'what can you do', 'commands', 'options'].some(h => lowerMessage.includes(h))) {
+        // Help / What can you do
+        if (['help', 'what can you do', 'commands', 'options', 'assist'].some(h => lowerMessage.includes(h))) {
             return {
-                message: "🤖 **I can help you with:**\n\n🎫 **Booking** — \"Book tickets\" or \"I want to attend\"\n🔍 **Search** — \"Show me events\" or \"Find concerts\"\n❌ **Cancel** — \"Cancel my booking\"\n❓ **Questions** — Ask me anything!\n\n💡 Try clicking the suggestions below!",
-                suggestions: ['Show me events', 'Book tickets', 'How do I register?']
+                message: "🤖 **I can help you with:**\n\n🎫 **Booking** — \"Book tickets\" or \"I want to attend\"\n🔍 **Search** — \"Show me events\" or \"Find concerts\"\n❌ **Cancel** — \"Cancel my booking\"\n❓ **FAQs** — Ask about the platform!\n\n**Example Questions:**\n• How do I create an account?\n• What types of events can I find?\n• How do I become an organizer?",
+                suggestions: ['Show me events', 'How do I register?', 'What is this app?']
+            };
+        }
+
+        // About the platform / What is this app
+        if (['what is this', 'about', 'platform', 'what does this', 'event management system'].some(a => lowerMessage.includes(a))) {
+            return {
+                message: "🎪 **About EventHub**\n\nThis is an Event Management System that helps you:\n\n• 🔍 Discover and search events\n• 🎫 Book tickets easily\n• 📋 Manage your bookings\n• 🎪 Create and organize events (for organizers)\n\nWe support concerts, workshops, conferences, sports events, and more!",
+                suggestions: ['Show me events', 'How do I register?', 'Help']
             };
         }
 
         // Registration / Sign up
-        if (['register', 'sign up', 'create account', 'new account'].some(r => lowerMessage.includes(r))) {
+        if (['register', 'sign up', 'create account', 'new account', 'how to join', 'make account'].some(r => lowerMessage.includes(r))) {
             return {
-                message: "📝 **How to Create an Account**\n\n1. Click \"Create Account\" below\n2. Choose your role (Attendee or Organizer)\n3. Fill in your details\n4. You're ready to book events!\n\n🎫 Attendees can book events\n🎪 Organizers can create events",
-                suggestions: ['Show me events', 'Help'],
+                message: "📝 **How to Create an Account**\n\n1. Click \"Sign Up\" on the homepage\n2. Choose your role:\n   • **Attendee** — Browse and book events\n   • **Organizer** — Create and manage events\n3. Fill in your name, email, and password\n4. You're ready to go!\n\n🎫 After registering, you can start booking events immediately.",
+                suggestions: ['Show me events', 'How to become organizer?'],
                 actions: [
                     { type: 'navigate', label: 'Create Account', target: '/register' },
                     { type: 'navigate', label: 'Sign In', target: '/login' }
@@ -561,10 +569,10 @@ export class ChatbotService {
             };
         }
 
-        // Login
-        if (['login', 'log in', 'sign in', 'signin'].some(l => lowerMessage.includes(l))) {
+        // Login / Sign in
+        if (['login', 'log in', 'sign in', 'signin', 'access account'].some(l => lowerMessage.includes(l))) {
             return {
-                message: "🔐 **Sign In**\n\nClick below to sign in to your account.\n\nForgot your password? Use the reset option on the login page.",
+                message: "🔐 **Sign In to Your Account**\n\nClick below to log in.\n\n**Forgot your password?**\nUse the \"Forgot Password\" link on the login page to reset it via email.",
                 suggestions: ['Show me events', 'How do I register?'],
                 actions: [
                     { type: 'navigate', label: 'Sign In', target: '/login' }
@@ -572,9 +580,31 @@ export class ChatbotService {
             };
         }
 
+        // Forgot password
+        if (['forgot password', 'reset password', 'can\'t login', 'password reset'].some(p => lowerMessage.includes(p))) {
+            return {
+                message: "🔑 **Reset Your Password**\n\n1. Go to the Login page\n2. Click \"Forgot Password\"\n3. Enter your email address\n4. Check your email for reset instructions\n5. Create a new password\n\nIf you don't receive the email, check your spam folder.",
+                suggestions: ['Help', 'Show me events'],
+                actions: [
+                    { type: 'navigate', label: 'Go to Login', target: '/login' }
+                ]
+            };
+        }
+
+        // How to book / Booking process
+        if (['how to book', 'how do i book', 'booking process', 'buy ticket', 'get ticket', 'reserve'].some(b => lowerMessage.includes(b))) {
+            return {
+                message: "🎫 **How to Book an Event**\n\n1. Browse the Events page\n2. Click on an event you like\n3. Select your ticket type\n4. Choose quantity\n5. Click \"Book Now\"\n\n✅ You'll get a booking confirmation immediately!\n\n⚠️ You must be logged in to book.",
+                suggestions: ['Show me events', 'My bookings'],
+                actions: [
+                    { type: 'navigate', label: 'Browse Events', target: '/events' }
+                ]
+            };
+        }
+
         // Cancel booking
         if (['cancel', 'cancellation'].some(c => lowerMessage.includes(c)) &&
-            ['booking', 'ticket', 'reservation'].some(b => lowerMessage.includes(b))) {
+            ['booking', 'ticket', 'reservation', 'my'].some(b => lowerMessage.includes(b))) {
             if (!userId) {
                 return {
                     message: "🔐 You need to be logged in to manage bookings.",
@@ -584,29 +614,189 @@ export class ChatbotService {
                 };
             }
             return {
-                message: "❌ **Cancel a Booking**\n\nTo cancel a booking:\n\n1. Go to \"My Bookings\"\n2. Find your booking\n3. Click \"Cancel Booking\"\n\n⚠️ Note: Cancellation policies may vary by event.",
-                suggestions: ['Show me events', 'Help'],
+                message: "❌ **Cancel a Booking**\n\n1. Go to \"My Bookings\"\n2. Find the event you want to cancel\n3. Click \"Cancel Booking\"\n\n⚠️ **Note:** Cancellation policies may vary by event. Cancelled tickets may free up spots for others on the waitlist.",
+                suggestions: ['Show me events', 'My bookings'],
                 actions: [
                     { type: 'navigate', label: 'My Bookings', target: '/bookings' }
                 ]
             };
         }
 
-        // Create event
-        if (['create event', 'organize', 'host event', 'make event'].some(c => lowerMessage.includes(c))) {
+        // Limit on bookings
+        if (['limit', 'how many can i book', 'maximum booking'].some(l => lowerMessage.includes(l))) {
             return {
-                message: "🎪 **Create an Event**\n\nTo create an event:\n\n1. Sign up as an Organizer\n2. Go to your Dashboard\n3. Click \"Create Event\"\n4. Fill in the details\n\n✨ Add tickets, set capacity, and publish!",
-                suggestions: ['Show me events', 'How do I register?'],
+                message: "📊 **Booking Limits**\n\nThere's no limit on how many different events you can book!\n\nHowever, each booking may be limited to a certain number of tickets per person (usually up to 10) based on event availability.",
+                suggestions: ['Show me events', 'How to book?']
+            };
+        }
+
+        // Sold out / Full capacity
+        if (['sold out', 'full', 'no tickets', 'capacity'].some(s => lowerMessage.includes(s))) {
+            return {
+                message: "🚫 **Sold Out Events**\n\nWhen an event reaches full capacity:\n• The \"Book Now\" button is disabled\n• Event shows as \"Sold Out\"\n\n💡 **Tip:** You may be able to join a waitlist. If someone cancels, spots may open up!",
+                suggestions: ['Show me events', 'Help']
+            };
+        }
+
+        // Notifications / Reminders
+        if (['notification', 'reminder', 'alert', 'email'].some(n => lowerMessage.includes(n))) {
+            return {
+                message: "🔔 **Notifications & Reminders**\n\nYes! You'll receive:\n• Booking confirmation emails\n• Event reminders before your events\n• Updates if event details change\n\nMake sure your email is correct in your profile!",
+                suggestions: ['My bookings', 'Help']
+            };
+        }
+
+        // Past bookings / History
+        if (['past booking', 'booking history', 'previous event', 'attended'].some(p => lowerMessage.includes(p))) {
+            return {
+                message: "📜 **Booking History**\n\nYou can see all your past and upcoming bookings in \"My Bookings\".\n\nThis includes:\n• Event details\n• Booking reference\n• Status (confirmed, cancelled, attended)",
+                suggestions: ['My bookings', 'Show me events'],
                 actions: userId ? [
-                    { type: 'navigate', label: 'Go to Dashboard', target: '/dashboard' }
+                    { type: 'navigate', label: 'View My Bookings', target: '/bookings' }
                 ] : [
                     { type: 'navigate', label: 'Sign In', target: '/login' }
                 ]
             };
         }
 
+        // Create event / Become organizer
+        if (['create event', 'organize', 'host event', 'make event', 'become organizer', 'organizer account'].some(c => lowerMessage.includes(c))) {
+            return {
+                message: "🎪 **Creating Events**\n\nTo create an event, you need an **Organizer account**.\n\n**Steps:**\n1. Register as an Organizer (or request upgrade)\n2. Go to your Dashboard\n3. Click \"Create Event\"\n4. Fill in: title, description, date, location, capacity\n5. Add ticket types and publish!\n\n✨ You can track attendees and bookings from your dashboard.",
+                suggestions: ['How do I register?', 'Show me events'],
+                actions: userId ? [
+                    { type: 'navigate', label: 'Go to Dashboard', target: '/dashboard' }
+                ] : [
+                    { type: 'navigate', label: 'Register', target: '/register' }
+                ]
+            };
+        }
+
+        // Edit event
+        if (['edit event', 'update event', 'change event', 'modify event'].some(e => lowerMessage.includes(e))) {
+            return {
+                message: "✏️ **Editing Events**\n\nOrganizers can edit their events anytime before the event ends.\n\n**You can update:**\n• Title and description\n• Date, time, location\n• Capacity\n• Ticket types\n\n⚠️ Note: You cannot edit events that have already concluded.",
+                suggestions: ['How to create event?', 'Help']
+            };
+        }
+
+        // View attendees
+        if (['view attendee', 'attendee list', 'see attendee', 'who registered', 'participant'].some(a => lowerMessage.includes(a))) {
+            return {
+                message: "👥 **View Attendees**\n\nOrganizers can view all registered attendees:\n\n1. Go to your Dashboard\n2. Click \"Manage\" on your event\n3. Go to \"Attendees\" tab\n\nYou'll see names, emails, booking references, and ticket quantities.",
+                suggestions: ['How to create event?', 'Help']
+            };
+        }
+
+        // Delete event
+        if (['delete event', 'remove event', 'cancel event'].some(d => lowerMessage.includes(d))) {
+            return {
+                message: "🗑️ **Deleting Events**\n\nOrganizers can delete their own events:\n\n1. Go to your Dashboard\n2. Click \"Manage\" on the event\n3. Click \"Delete Event\"\n\n⚠️ Consider the impact on attendees who have already booked before deleting.",
+                suggestions: ['How to create event?', 'Help']
+            };
+        }
+
+        // Change capacity
+        if (['change capacity', 'update capacity', 'increase capacity', 'more tickets'].some(c => lowerMessage.includes(c))) {
+            return {
+                message: "📊 **Changing Event Capacity**\n\nOrganizers can update capacity in the event edit page.\n\n⚠️ **Note:** Reducing capacity below current bookings may cause issues. It's best to only increase capacity.",
+                suggestions: ['How to edit event?', 'Help']
+            };
+        }
+
+        // User roles
+        if (['what role', 'types of user', 'attendee vs organizer', 'role'].some(r => lowerMessage.includes(r))) {
+            return {
+                message: "👤 **User Roles**\n\n**🎫 Attendee**\n• Browse and search events\n• Book tickets\n• Manage bookings\n\n**🎪 Organizer**\n• All attendee features\n• Create and manage events\n• View attendee lists\n\n**👑 Administrator**\n• Full platform control\n• User management\n• Content moderation",
+                suggestions: ['How to register?', 'How to become organizer?']
+            };
+        }
+
+        // Switch role
+        if (['switch role', 'change role', 'upgrade account', 'become organizer'].some(s => lowerMessage.includes(s))) {
+            return {
+                message: "🔄 **Changing Your Role**\n\nTo switch from Attendee to Organizer:\n• Contact an Administrator\n• Or use the role request feature if available\n\nAdmins can update user roles from the admin panel.",
+                suggestions: ['What are user roles?', 'Help']
+            };
+        }
+
+        // Login problems / Troubleshooting
+        if (['can\'t login', 'cant login', 'login problem', 'login error', 'access issue'].some(l => lowerMessage.includes(l))) {
+            return {
+                message: "🔧 **Login Troubleshooting**\n\n1. Check you're using the correct email\n2. Ensure your password is correct\n3. Make sure your internet is stable\n4. Try \"Forgot Password\" to reset\n5. Clear your browser cache\n\nIf issues persist, contact support.",
+                suggestions: ['Forgot password', 'Help']
+            };
+        }
+
+        // Booking not showing
+        if (['booking not showing', 'can\'t see booking', 'booking missing', 'where is my booking'].some(b => lowerMessage.includes(b))) {
+            return {
+                message: "🔍 **Can't Find Your Booking?**\n\n1. Try refreshing the page\n2. Make sure you're logged in\n3. Check your email for confirmation\n\nIf the booking isn't there, it may not have completed successfully. Try booking again.",
+                suggestions: ['My bookings', 'Help']
+            };
+        }
+
+        // Supported browsers
+        if (['browser', 'chrome', 'firefox', 'safari', 'edge', 'supported'].some(b => lowerMessage.includes(b))) {
+            return {
+                message: "🌐 **Supported Browsers**\n\nThe platform works best on modern browsers:\n• Google Chrome\n• Mozilla Firefox\n• Safari\n• Microsoft Edge\n\n📱 It's also mobile-friendly!",
+                suggestions: ['Help', 'Show me events']
+            };
+        }
+
+        // Mobile / Responsive
+        if (['mobile', 'phone', 'tablet', 'responsive', 'app'].some(m => lowerMessage.includes(m))) {
+            return {
+                message: "📱 **Mobile Access**\n\nYes! The platform is fully responsive and works great on:\n• Smartphones\n• Tablets\n• Laptops and desktops\n\nNo app download required — just use your browser!",
+                suggestions: ['Show me events', 'Help']
+            };
+        }
+
+        // Admin functions
+        if (['admin', 'administrator', 'moderat'].some(a => lowerMessage.includes(a))) {
+            return {
+                message: "👑 **Administrator Functions**\n\nAdministrators can:\n• Manage all events\n• View and manage all users\n• Change user roles\n• Suspend or remove accounts\n• Moderate event content\n• View system analytics\n\nFor admin support, use the admin contact system.",
+                suggestions: ['What are user roles?', 'Help']
+            };
+        }
+
+        // Free / Pricing
+        if (['free', 'cost', 'price', 'pay', 'fee'].some(f => lowerMessage.includes(f))) {
+            return {
+                message: "💰 **Pricing**\n\nThe platform is **free to use**!\n\n• Creating an account: Free\n• Browsing events: Free\n• Booking: Free (some events may have ticket prices)\n\nCurrently, all events on this platform are **free to attend**! 🎉",
+                suggestions: ['Show me events', 'Help']
+            };
+        }
+
+        // Search events
+        if (['search', 'find event', 'look for', 'filter'].some(s => lowerMessage.includes(s))) {
+            return {
+                message: "🔍 **Searching Events**\n\nYou can search and filter events by:\n• Event name or keywords\n• Category (concerts, workshops, etc.)\n• Location\n• Date range\n• Availability\n\nUse the search bar and filters on the Events page!",
+                suggestions: ['Show me events', 'Categories'],
+                actions: [
+                    { type: 'navigate', label: 'Browse Events', target: '/events' }
+                ]
+            };
+        }
+
+        // Event types / Categories
+        if (['type of event', 'categories', 'what kind', 'genres', 'concerts', 'workshops', 'conference'].some(t => lowerMessage.includes(t))) {
+            return {
+                message: "🎭 **Event Types**\n\nYou can find all kinds of events:\n• 🎵 Concerts & Music\n• 🎓 Workshops & Classes\n• 💼 Conferences & Seminars\n• 🏃 Sports Events\n• 🎉 Meetups & Networking\n• 💻 Webinars (Virtual Events)\n• And more!",
+                suggestions: ['Show me events', 'Search events']
+            };
+        }
+
+        // Virtual / Online events
+        if (['virtual', 'online', 'webinar', 'remote', 'zoom', 'meet'].some(v => lowerMessage.includes(v))) {
+            return {
+                message: "💻 **Virtual Events**\n\nYes! Organizers can create online/virtual events.\n\nFor virtual events, the organizer provides meeting links (Zoom, Google Meet, etc.) in the event details.\n\nCheck the event description for joining instructions!",
+                suggestions: ['Show me events', 'Help']
+            };
+        }
+
         // My bookings
-        if (['my booking', 'my ticket', 'my reservation', 'booked'].some(m => lowerMessage.includes(m))) {
+        if (['my booking', 'my ticket', 'my reservation', 'booked', 'where are my'].some(m => lowerMessage.includes(m))) {
             if (!userId) {
                 return {
                     message: "🔐 Sign in to view your bookings.",
@@ -616,7 +806,7 @@ export class ChatbotService {
                 };
             }
             return {
-                message: "🎫 **Your Bookings**\n\nView all your tickets and booking history in \"My Bookings\".",
+                message: "🎫 **Your Bookings**\n\nView all your tickets and booking history in \"My Bookings\".\n\nYou can see:\n• Upcoming events\n• Past events\n• Booking status\n• Cancel bookings",
                 suggestions: ['Show me events', 'Help'],
                 actions: [
                     { type: 'navigate', label: 'View My Bookings', target: '/bookings' }
@@ -624,18 +814,49 @@ export class ChatbotService {
             };
         }
 
+        // Contact / Support
+        if (['contact', 'support', 'help desk', 'customer service', 'reach out'].some(c => lowerMessage.includes(c))) {
+            return {
+                message: "📞 **Need Help?**\n\nFor support:\n• Check this FAQ section\n• Use the Help & Support section in the app\n• Contact support through the contact form\n\nFor urgent issues or abuse reports, administrators can be reached through the admin contact system.",
+                suggestions: ['Help', 'Show me events']
+            };
+        }
+
         // Thanks
-        if (['thank', 'thanks', 'thx', 'awesome', 'great'].some(t => lowerMessage.includes(t))) {
+        if (['thank', 'thanks', 'thx', 'awesome', 'great', 'perfect', 'cool'].some(t => lowerMessage.includes(t))) {
             return {
                 message: "😊 You're welcome! Happy to help.\n\nAnything else you'd like to know?",
                 suggestions: ['Show me events', 'Help']
             };
         }
 
-        // Default fallback
+        // Goodbye
+        if (['bye', 'goodbye', 'see you', 'later', 'exit', 'quit'].some(b => lowerMessage.includes(b))) {
+            return {
+                message: "👋 Goodbye! Have a great time at your events!\n\nCome back anytime you need help.",
+                suggestions: ['Show me events']
+            };
+        }
+
+        // Out of context detection - reject unrelated questions
+        const outOfContextPatterns = [
+            'weather', 'joke', 'story', 'cook', 'recipe', 'game', 'movie', 'music',
+            'news', 'politics', 'sports score', 'stock', 'crypto', 'bitcoin',
+            'relationship', 'dating', 'math', 'calculate', 'code', 'programming',
+            'translate', 'language', 'country', 'capital', 'president', 'celebrity'
+        ];
+
+        if (outOfContextPatterns.some(p => lowerMessage.includes(p))) {
+            return {
+                message: "🚫 I can only help with questions about this Event Management platform.\n\nI can assist you with:\n• Finding and booking events\n• Account questions\n• Platform features\n\nWhat can I help you with?",
+                suggestions: ['Show me events', 'Help', 'How to book?']
+            };
+        }
+
+        // Default fallback - friendly and helpful
         return {
-            message: "🤔 I'm not sure about that.\n\nI can help you with:\n• Finding and booking events\n• Creating an account\n• Managing your bookings\n\nTry one of the options below!",
-            suggestions: ['Show me events', 'Book tickets', 'Help'],
+            message: "🤔 I'm not quite sure about that.\n\n**I can help you with:**\n• 🎫 Finding and booking events\n• 📝 Account registration & login\n• ❓ Platform FAQs\n• 🎪 Event creation (for organizers)\n\nTry asking something like:\n• \"How do I book an event?\"\n• \"Show me events\"\n• \"How do I become an organizer?\"",
+            suggestions: ['Show me events', 'Help', 'How to book?'],
             actions: [
                 { type: 'navigate', label: 'Browse Events', target: '/events' }
             ]
