@@ -63,7 +63,7 @@ export class OrganizerController {
 
     createEvent = asyncHandler(async (req: Request, res: Response) => {
         const organizerId = req.user!.userId;
-        const eventData = req.body;
+        const { ticketTypes: ticketTypesData, ...eventData } = req.body;
 
         // Validate category exists
         const category = await this.categoryRepository.findOne({
@@ -90,17 +90,44 @@ export class OrganizerController {
             })
         )) as unknown as Event;
 
-        // Auto-create a default ticket type so the event can accept bookings
-        await this.ticketTypeRepository.save(
-            this.ticketTypeRepository.create({
-                eventId: newEvent.id,
-                name: 'General Admission',
-                description: 'Standard entry ticket',
-                price: 0, // Free events
-                capacity: eventData.capacity || 100,
-                sold: 0,
-            })
-        );
+        // Create ticket types from request, or default if not provided
+        if (ticketTypesData && Array.isArray(ticketTypesData) && ticketTypesData.length > 0) {
+            // Validate and create provided ticket types
+            let totalTicketCapacity = 0;
+            for (const ticketData of ticketTypesData) {
+                if (!ticketData.name || !ticketData.capacity) {
+                    continue; // Skip incomplete ticket types
+                }
+                totalTicketCapacity += Number(ticketData.capacity);
+                await this.ticketTypeRepository.save(
+                    this.ticketTypeRepository.create({
+                        eventId: newEvent.id,
+                        name: ticketData.name,
+                        description: ticketData.description || '',
+                        price: Number(ticketData.price) || 0,
+                        capacity: Number(ticketData.capacity),
+                        sold: 0,
+                    })
+                );
+            }
+
+            // Update event capacity to match total ticket capacity if different
+            if (totalTicketCapacity > 0 && totalTicketCapacity !== eventData.capacity) {
+                await this.eventRepository.update(newEvent.id, { capacity: totalTicketCapacity });
+            }
+        } else {
+            // Fallback: create default ticket type
+            await this.ticketTypeRepository.save(
+                this.ticketTypeRepository.create({
+                    eventId: newEvent.id,
+                    name: 'General Admission',
+                    description: 'Standard entry ticket',
+                    price: 0,
+                    capacity: eventData.capacity || 100,
+                    sold: 0,
+                })
+            );
+        }
 
         // Load relations
         const createdEvent = await this.eventRepository.findOne({

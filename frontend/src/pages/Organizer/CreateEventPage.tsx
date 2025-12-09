@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Row, Col, Card, Form, Button } from 'react-bootstrap';
+import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import { organizerApi } from '../../api/organizer.api';
 import { eventsApi } from '../../api/events.api';
@@ -8,12 +8,19 @@ import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ErrorAlert from '../../components/Common/ErrorAlert';
 import { extractErrorMessage } from '../../utils/errorHelper';
 
+interface TicketConfig {
+    enabled: boolean;
+    capacity: number;
+    price: number;
+}
+
 const CreateEventPage: React.FC = () => {
     const navigate = useNavigate();
     const [categories, setCategories] = useState<CategoryType[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
+
     const [formData, setFormData] = useState({
         title: '',
         description: '',
@@ -22,10 +29,22 @@ const CreateEventPage: React.FC = () => {
         location: '',
         address: '',
         categoryId: '',
-        capacity: 100,
         bannerImage: '',
         teaserVideo: '',
         isPublished: true,
+    });
+
+    // Ticket configuration state
+    const [regularTicket, setRegularTicket] = useState<TicketConfig>({
+        enabled: true,
+        capacity: 100,
+        price: 0, // Always free
+    });
+
+    const [vipTicket, setVipTicket] = useState<TicketConfig>({
+        enabled: false,
+        capacity: 20,
+        price: 99.99,
     });
 
     useEffect(() => {
@@ -57,30 +76,61 @@ const CreateEventPage: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
+
+        // Validate at least one ticket type is enabled
+        if (!regularTicket.enabled && !vipTicket.enabled) {
+            setError('Please enable at least one ticket type (Regular or VIP)');
+            return;
+        }
+
+        // Validate capacities
+        if (regularTicket.enabled && regularTicket.capacity < 1) {
+            setError('Regular ticket capacity must be at least 1');
+            return;
+        }
+        if (vipTicket.enabled && vipTicket.capacity < 1) {
+            setError('VIP ticket capacity must be at least 1');
+            return;
+        }
+        if (vipTicket.enabled && vipTicket.price < 0) {
+            setError('VIP ticket price cannot be negative');
+            return;
+        }
+
         setSubmitting(true);
 
+        // Build ticket types array
+        const ticketTypes: { name: string; description: string; price: number; capacity: number }[] = [];
+
+        if (regularTicket.enabled) {
+            ticketTypes.push({
+                name: 'Regular',
+                description: 'Standard entry ticket - Free admission',
+                price: 0,
+                capacity: regularTicket.capacity,
+            });
+        }
+
+        if (vipTicket.enabled) {
+            ticketTypes.push({
+                name: 'VIP',
+                description: 'VIP access with premium benefits',
+                price: vipTicket.price,
+                capacity: vipTicket.capacity,
+            });
+        }
+
+        // Calculate total capacity
+        const totalCapacity = ticketTypes.reduce((sum, t) => sum + t.capacity, 0);
+
         try {
-            const response = await organizerApi.createEvent({
+            await organizerApi.createEvent({
                 ...formData,
-                capacity: Number(formData.capacity),
+                capacity: totalCapacity,
+                ticketTypes,
             });
 
-            const eventId = response.data.event.id;
-
-            // Create a default ticket type so event isn't "sold out"
-            try {
-                await organizerApi.createTicketType(eventId, {
-                    name: 'General Admission',
-                    description: 'Standard entry ticket',
-                    price: 0, // Free by default
-                    capacity: Number(formData.capacity),
-                });
-            } catch (ticketError) {
-                console.error('Failed to create default ticket:', ticketError);
-                // Continue anyway - user can add tickets later
-            }
-
-            navigate(`/organizer/dashboard`);
+            navigate('/organizer/dashboard');
         } catch (err: any) {
             setError(extractErrorMessage(err, 'Failed to create event. Please try again.'));
         } finally {
@@ -96,11 +146,13 @@ const CreateEventPage: React.FC = () => {
 
             {error && <ErrorAlert message={error} onClose={() => setError('')} />}
 
-            <Card>
-                <Card.Body>
-                    <Form onSubmit={handleSubmit}>
-                        <Row>
-                            <Col md={8}>
+            <Form onSubmit={handleSubmit}>
+                <Row>
+                    {/* Left Column - Event Details */}
+                    <Col lg={8}>
+                        <Card className="mb-4">
+                            <Card.Header><strong>Event Details</strong></Card.Header>
+                            <Card.Body>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Event Title *</Form.Label>
                                     <Form.Control
@@ -173,37 +225,45 @@ const CreateEventPage: React.FC = () => {
                                         placeholder="Full address (optional)"
                                     />
                                 </Form.Group>
-                            </Col>
 
-                            <Col md={4}>
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Category *</Form.Label>
-                                    <Form.Select
-                                        name="categoryId"
-                                        value={formData.categoryId}
-                                        onChange={handleChange}
-                                        required
-                                    >
-                                        {categories.map((cat) => (
-                                            <option key={cat.id} value={cat.id}>
-                                                {cat.name}
-                                            </option>
-                                        ))}
-                                    </Form.Select>
-                                </Form.Group>
+                                <Row>
+                                    <Col md={6}>
+                                        <Form.Group className="mb-3">
+                                            <Form.Label>Category *</Form.Label>
+                                            <Form.Select
+                                                name="categoryId"
+                                                value={formData.categoryId}
+                                                onChange={handleChange}
+                                                required
+                                            >
+                                                {categories.map((cat) => (
+                                                    <option key={cat.id} value={cat.id}>
+                                                        {cat.name}
+                                                    </option>
+                                                ))}
+                                            </Form.Select>
+                                        </Form.Group>
+                                    </Col>
+                                    <Col md={6}>
+                                        <Form.Group className="mb-3">
+                                            <Form.Check
+                                                type="checkbox"
+                                                name="isPublished"
+                                                label="Publish immediately"
+                                                checked={formData.isPublished}
+                                                onChange={handleChange}
+                                                className="mt-4"
+                                            />
+                                        </Form.Group>
+                                    </Col>
+                                </Row>
+                            </Card.Body>
+                        </Card>
 
-                                <Form.Group className="mb-3">
-                                    <Form.Label>Capacity *</Form.Label>
-                                    <Form.Control
-                                        type="number"
-                                        name="capacity"
-                                        value={formData.capacity}
-                                        onChange={handleChange}
-                                        min="1"
-                                        required
-                                    />
-                                </Form.Group>
-
+                        {/* Media Section */}
+                        <Card className="mb-4">
+                            <Card.Header><strong>Media (Optional)</strong></Card.Header>
+                            <Card.Body>
                                 <Form.Group className="mb-3">
                                     <Form.Label>Banner Image URL</Form.Label>
                                     <Form.Control
@@ -222,33 +282,138 @@ const CreateEventPage: React.FC = () => {
                                         name="teaserVideo"
                                         value={formData.teaserVideo}
                                         onChange={handleChange}
-                                        placeholder="https://example.com/video.mp4"
+                                        placeholder="https://youtube.com/watch?v=..."
                                     />
                                 </Form.Group>
+                            </Card.Body>
+                        </Card>
+                    </Col>
 
-                                <Form.Group className="mb-3">
-                                    <Form.Check
-                                        type="checkbox"
-                                        name="isPublished"
-                                        label="Publish immediately"
-                                        checked={formData.isPublished}
-                                        onChange={handleChange}
-                                    />
-                                </Form.Group>
-                            </Col>
-                        </Row>
+                    {/* Right Column - Ticket Configuration */}
+                    <Col lg={4}>
+                        <Card className="mb-4" style={{ position: 'sticky', top: '80px' }}>
+                            <Card.Header className="bg-primary text-white">
+                                <strong>🎫 Ticket Configuration</strong>
+                            </Card.Header>
+                            <Card.Body>
+                                <Alert variant="info" className="py-2 mb-3">
+                                    <small>Configure ticket types for your event. Regular tickets are free, VIP tickets have a price.</small>
+                                </Alert>
 
-                        <div className="d-flex gap-2">
-                            <Button type="submit" variant="primary" disabled={submitting}>
-                                {submitting ? 'Creating...' : 'Create Event'}
-                            </Button>
-                            <Button variant="secondary" onClick={() => navigate('/organizer/dashboard')}>
-                                Cancel
-                            </Button>
-                        </div>
-                    </Form>
-                </Card.Body>
-            </Card>
+                                {/* Regular Ticket */}
+                                <Card className={`mb-3 ${regularTicket.enabled ? 'border-success' : ''}`}>
+                                    <Card.Body className="py-3">
+                                        <Form.Check
+                                            type="switch"
+                                            id="regular-ticket-switch"
+                                            label={<strong>Regular Ticket</strong>}
+                                            checked={regularTicket.enabled}
+                                            onChange={(e) => setRegularTicket({ ...regularTicket, enabled: e.target.checked })}
+                                            className="mb-2"
+                                        />
+
+                                        {regularTicket.enabled && (
+                                            <>
+                                                <div className="mb-2">
+                                                    <span className="badge bg-success">FREE</span>
+                                                </div>
+                                                <Form.Group>
+                                                    <Form.Label className="small mb-1">Capacity</Form.Label>
+                                                    <Form.Control
+                                                        type="number"
+                                                        size="sm"
+                                                        min="1"
+                                                        value={regularTicket.capacity}
+                                                        onChange={(e) => setRegularTicket({
+                                                            ...regularTicket,
+                                                            capacity: parseInt(e.target.value) || 0
+                                                        })}
+                                                    />
+                                                </Form.Group>
+                                            </>
+                                        )}
+                                    </Card.Body>
+                                </Card>
+
+                                {/* VIP Ticket */}
+                                <Card className={`mb-3 ${vipTicket.enabled ? 'border-warning' : ''}`}>
+                                    <Card.Body className="py-3">
+                                        <Form.Check
+                                            type="switch"
+                                            id="vip-ticket-switch"
+                                            label={<strong>VIP Ticket</strong>}
+                                            checked={vipTicket.enabled}
+                                            onChange={(e) => setVipTicket({ ...vipTicket, enabled: e.target.checked })}
+                                            className="mb-2"
+                                        />
+
+                                        {vipTicket.enabled && (
+                                            <>
+                                                <div className="mb-2">
+                                                    <span className="badge bg-warning text-dark">PAID</span>
+                                                </div>
+                                                <Row>
+                                                    <Col xs={6}>
+                                                        <Form.Group>
+                                                            <Form.Label className="small mb-1">Capacity</Form.Label>
+                                                            <Form.Control
+                                                                type="number"
+                                                                size="sm"
+                                                                min="1"
+                                                                value={vipTicket.capacity}
+                                                                onChange={(e) => setVipTicket({
+                                                                    ...vipTicket,
+                                                                    capacity: parseInt(e.target.value) || 0
+                                                                })}
+                                                            />
+                                                        </Form.Group>
+                                                    </Col>
+                                                    <Col xs={6}>
+                                                        <Form.Group>
+                                                            <Form.Label className="small mb-1">Price ($)</Form.Label>
+                                                            <Form.Control
+                                                                type="number"
+                                                                size="sm"
+                                                                min="0"
+                                                                step="0.01"
+                                                                value={vipTicket.price}
+                                                                onChange={(e) => setVipTicket({
+                                                                    ...vipTicket,
+                                                                    price: parseFloat(e.target.value) || 0
+                                                                })}
+                                                            />
+                                                        </Form.Group>
+                                                    </Col>
+                                                </Row>
+                                            </>
+                                        )}
+                                    </Card.Body>
+                                </Card>
+
+                                {/* Capacity Summary */}
+                                <div className="bg-light p-2 rounded mb-3">
+                                    <small className="text-muted d-block">Total Event Capacity:</small>
+                                    <strong>
+                                        {(regularTicket.enabled ? regularTicket.capacity : 0) +
+                                            (vipTicket.enabled ? vipTicket.capacity : 0)} seats
+                                    </strong>
+                                </div>
+
+                                <hr />
+
+                                <div className="d-grid gap-2">
+                                    <Button type="submit" variant="primary" size="lg" disabled={submitting}>
+                                        {submitting ? 'Creating...' : 'Create Event'}
+                                    </Button>
+                                    <Button variant="outline-secondary" onClick={() => navigate('/organizer/dashboard')}>
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </Card.Body>
+                        </Card>
+                    </Col>
+                </Row>
+            </Form>
         </Container>
     );
 };
