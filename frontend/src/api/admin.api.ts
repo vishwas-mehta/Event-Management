@@ -63,12 +63,18 @@ export const adminApi = {
         return response.data;
     },
 
-    // Handle reported event
-    handleReportedEvent: async (
+    // Resolve a report
+    resolveReport: async (
         id: string,
-        action: 'dismiss' | 'remove'
+        adminNotes?: string
     ): Promise<ApiResponse<{ message: string }>> => {
-        const response = await api.post(`/admin/reported-events/${id}/handle`, { action });
+        const response = await api.post(`/admin/reported-events/${id}/resolve`, { adminNotes });
+        return response.data;
+    },
+
+    // Delete event (admin only)
+    deleteEvent: async (id: string): Promise<ApiResponse<{ message: string }>> => {
+        const response = await api.delete(`/admin/events/${id}`);
         return response.data;
     },
 };

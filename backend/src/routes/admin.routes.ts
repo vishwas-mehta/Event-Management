@@ -12,14 +12,20 @@ router.use(authenticate, authorize([UserRole.ADMIN]));
 // Dashboard
 router.get('/dashboard', adminController.getDashboard);
 
-// orgainizer management
+// User management
+router.get('/users', adminController.getAllUsers);
+router.patch('/users/:id/status', adminController.updateUserStatus);
+
+// Organizer management
 router.get('/pending-organizers', adminController.getPendingOrganizers);
 router.post('/organizers/:id/approve', adminController.approveOrganizer);
 router.post('/organizers/:id/reject', adminController.rejectOrganizer);
 
-
 // Reported Events
 router.get('/reported-events', adminController.getReportedEvents);
-router.patch('/users/:id/status', adminController.updateUserStatus);
+router.post('/reported-events/:id/resolve', adminController.resolveReport);
+
+// Event management
+router.delete('/events/:id', adminController.deleteEvent);
 
 export default router;
