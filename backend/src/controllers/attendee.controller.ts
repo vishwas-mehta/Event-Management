@@ -94,14 +94,49 @@ export class AttendeeController {
             }
 
             // Calculate total price (apply dynamic pricing if applicable)
-            let effectivePrice = ticketType.price;
+            let effectivePrice = Number(ticketType.price);
             if (ticketType.dynamicPricing) {
-                const dp = ticketType.dynamicPricing;
-                if (dp.type === 'early_bird' && dp.endDate) {
-                    if (new Date(dp.endDate) > now) {
-                        effectivePrice = ticketType.price; // Already discounted price
-                    } else if (dp.originalPrice) {
-                        effectivePrice = dp.originalPrice; // Revert to original price
+                const dp = ticketType.dynamicPricing as any;
+                if (dp.type === 'early_bird') {
+                    // Quantity-based early bird: first N tickets at discounted price
+                    if (dp.earlyBirdQuantity !== undefined && dp.originalPrice !== undefined) {
+                        const earlyBirdRemaining = dp.earlyBirdQuantity - ticketType.sold;
+                        if (earlyBirdRemaining <= 0) {
+                            // Early bird sold out, use regular price
+                            effectivePrice = Number(dp.originalPrice);
+                        } else if (quantity > earlyBirdRemaining) {
+                            // Partial early bird: some at early bird price, rest at regular
+                            const earlyBirdTotal = earlyBirdRemaining * Number(dp.earlyBirdPrice || ticketType.price);
+                            const regularTotal = (quantity - earlyBirdRemaining) * Number(dp.originalPrice);
+                            const totalPrice = earlyBirdTotal + regularTotal;
+
+                            // Create booking with calculated mixed price
+                            const newBooking = transactionalEntityManager.getRepository(Booking).create({
+                                userId,
+                                eventId,
+                                ticketTypeId,
+                                quantity,
+                                totalPrice,
+                                status: BookingStatus.CONFIRMED,
+                            });
+
+                            await transactionalEntityManager.getRepository(Booking).save(newBooking);
+                            ticketType.sold += quantity;
+                            await transactionalEntityManager.getRepository(TicketType).save(ticketType);
+
+                            return newBooking;
+                        } else {
+                            // All tickets at early bird price
+                            effectivePrice = Number(dp.earlyBirdPrice || ticketType.price);
+                        }
+                    }
+                    // Date-based fallback
+                    else if (dp.endDate) {
+                        if (new Date(dp.endDate) > now) {
+                            effectivePrice = Number(ticketType.price);
+                        } else if (dp.originalPrice) {
+                            effectivePrice = Number(dp.originalPrice);
+                        }
                     }
                 }
             }
