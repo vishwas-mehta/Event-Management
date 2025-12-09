@@ -14,6 +14,12 @@ interface TicketConfig {
     price: number;
 }
 
+interface EarlyBirdConfig {
+    enabled: boolean;
+    quantity: number;  // Number of early bird tickets
+    price: number;     // Discounted early bird price
+}
+
 const CreateEventPage: React.FC = () => {
     const navigate = useNavigate();
     const [categories, setCategories] = useState<CategoryType[]>([]);
@@ -34,17 +40,24 @@ const CreateEventPage: React.FC = () => {
         isPublished: true,
     });
 
-    // Ticket configuration state
+    // Ticket configuration
     const [regularTicket, setRegularTicket] = useState<TicketConfig>({
         enabled: true,
         capacity: 100,
-        price: 0, // Always free
+        price: 0,
     });
 
     const [vipTicket, setVipTicket] = useState<TicketConfig>({
         enabled: false,
         capacity: 20,
         price: 99.99,
+    });
+
+    // Early Bird for VIP
+    const [earlyBird, setEarlyBird] = useState<EarlyBirdConfig>({
+        enabled: false,
+        quantity: 10,
+        price: 49.99,
     });
 
     useEffect(() => {
@@ -77,30 +90,52 @@ const CreateEventPage: React.FC = () => {
         e.preventDefault();
         setError('');
 
-        // Validate at least one ticket type is enabled
+        // Validations
         if (!regularTicket.enabled && !vipTicket.enabled) {
-            setError('Please enable at least one ticket type (Regular or VIP)');
+            setError('Please enable at least one ticket type');
             return;
         }
 
-        // Validate capacities
         if (regularTicket.enabled && regularTicket.capacity < 1) {
             setError('Regular ticket capacity must be at least 1');
             return;
         }
-        if (vipTicket.enabled && vipTicket.capacity < 1) {
-            setError('VIP ticket capacity must be at least 1');
-            return;
-        }
-        if (vipTicket.enabled && vipTicket.price < 0) {
-            setError('VIP ticket price cannot be negative');
-            return;
+
+        if (vipTicket.enabled) {
+            if (vipTicket.capacity < 1) {
+                setError('VIP ticket capacity must be at least 1');
+                return;
+            }
+            if (vipTicket.price < 0) {
+                setError('VIP ticket price cannot be negative');
+                return;
+            }
+
+            // Early bird validations
+            if (earlyBird.enabled) {
+                if (earlyBird.quantity < 1) {
+                    setError('Early bird quantity must be at least 1');
+                    return;
+                }
+                if (earlyBird.quantity >= vipTicket.capacity) {
+                    setError('Early bird quantity must be less than total VIP capacity');
+                    return;
+                }
+                if (earlyBird.price >= vipTicket.price) {
+                    setError('Early bird price should be less than regular VIP price');
+                    return;
+                }
+                if (earlyBird.price < 0) {
+                    setError('Early bird price cannot be negative');
+                    return;
+                }
+            }
         }
 
         setSubmitting(true);
 
-        // Build ticket types array
-        const ticketTypes: { name: string; description: string; price: number; capacity: number }[] = [];
+        // Build ticket types
+        const ticketTypes: any[] = [];
 
         if (regularTicket.enabled) {
             ticketTypes.push({
@@ -112,15 +147,28 @@ const CreateEventPage: React.FC = () => {
         }
 
         if (vipTicket.enabled) {
-            ticketTypes.push({
+            const vipTicketData: any = {
                 name: 'VIP',
-                description: 'VIP access with premium benefits',
-                price: vipTicket.price,
+                description: earlyBird.enabled
+                    ? `VIP access - First ${earlyBird.quantity} tickets at $${earlyBird.price.toFixed(2)}, then $${vipTicket.price.toFixed(2)}`
+                    : 'VIP access with premium benefits',
+                price: earlyBird.enabled ? earlyBird.price : vipTicket.price, // Start with early bird price
                 capacity: vipTicket.capacity,
-            });
+            };
+
+            // Add dynamic pricing config for early bird
+            if (earlyBird.enabled) {
+                vipTicketData.dynamicPricing = {
+                    type: 'early_bird',
+                    originalPrice: vipTicket.price,  // Regular VIP price after early bird
+                    earlyBirdQuantity: earlyBird.quantity,
+                    earlyBirdPrice: earlyBird.price,
+                };
+            }
+
+            ticketTypes.push(vipTicketData);
         }
 
-        // Calculate total capacity
         const totalCapacity = ticketTypes.reduce((sum, t) => sum + t.capacity, 0);
 
         try {
@@ -128,7 +176,7 @@ const CreateEventPage: React.FC = () => {
                 ...formData,
                 capacity: totalCapacity,
                 ticketTypes,
-            });
+            } as any);
 
             navigate('/organizer/dashboard');
         } catch (err: any) {
@@ -297,7 +345,7 @@ const CreateEventPage: React.FC = () => {
                             </Card.Header>
                             <Card.Body>
                                 <Alert variant="info" className="py-2 mb-3">
-                                    <small>Configure ticket types for your event. Regular tickets are free, VIP tickets have a price.</small>
+                                    <small>Configure ticket types. Regular is free, VIP is paid.</small>
                                 </Alert>
 
                                 {/* Regular Ticket */}
@@ -343,7 +391,12 @@ const CreateEventPage: React.FC = () => {
                                             id="vip-ticket-switch"
                                             label={<strong>VIP Ticket</strong>}
                                             checked={vipTicket.enabled}
-                                            onChange={(e) => setVipTicket({ ...vipTicket, enabled: e.target.checked })}
+                                            onChange={(e) => {
+                                                setVipTicket({ ...vipTicket, enabled: e.target.checked });
+                                                if (!e.target.checked) {
+                                                    setEarlyBird({ ...earlyBird, enabled: false });
+                                                }
+                                            }}
                                             className="mb-2"
                                         />
 
@@ -352,10 +405,10 @@ const CreateEventPage: React.FC = () => {
                                                 <div className="mb-2">
                                                     <span className="badge bg-warning text-dark">PAID</span>
                                                 </div>
-                                                <Row>
+                                                <Row className="mb-3">
                                                     <Col xs={6}>
                                                         <Form.Group>
-                                                            <Form.Label className="small mb-1">Capacity</Form.Label>
+                                                            <Form.Label className="small mb-1">Total Capacity</Form.Label>
                                                             <Form.Control
                                                                 type="number"
                                                                 size="sm"
@@ -370,7 +423,7 @@ const CreateEventPage: React.FC = () => {
                                                     </Col>
                                                     <Col xs={6}>
                                                         <Form.Group>
-                                                            <Form.Label className="small mb-1">Price ($)</Form.Label>
+                                                            <Form.Label className="small mb-1">Regular Price ($)</Form.Label>
                                                             <Form.Control
                                                                 type="number"
                                                                 size="sm"
@@ -385,6 +438,62 @@ const CreateEventPage: React.FC = () => {
                                                         </Form.Group>
                                                     </Col>
                                                 </Row>
+
+                                                {/* Early Bird Option */}
+                                                <div className="border-top pt-2">
+                                                    <Form.Check
+                                                        type="switch"
+                                                        id="early-bird-switch"
+                                                        label={<small><strong>🐦 Early Bird Pricing</strong></small>}
+                                                        checked={earlyBird.enabled}
+                                                        onChange={(e) => setEarlyBird({ ...earlyBird, enabled: e.target.checked })}
+                                                        className="mb-2"
+                                                    />
+
+                                                    {earlyBird.enabled && (
+                                                        <div className="bg-light p-2 rounded">
+                                                            <Row>
+                                                                <Col xs={6}>
+                                                                    <Form.Group className="mb-2">
+                                                                        <Form.Label className="small mb-1">First N tickets</Form.Label>
+                                                                        <Form.Control
+                                                                            type="number"
+                                                                            size="sm"
+                                                                            min="1"
+                                                                            max={vipTicket.capacity - 1}
+                                                                            value={earlyBird.quantity}
+                                                                            onChange={(e) => setEarlyBird({
+                                                                                ...earlyBird,
+                                                                                quantity: parseInt(e.target.value) || 0
+                                                                            })}
+                                                                        />
+                                                                    </Form.Group>
+                                                                </Col>
+                                                                <Col xs={6}>
+                                                                    <Form.Group className="mb-2">
+                                                                        <Form.Label className="small mb-1">At Price ($)</Form.Label>
+                                                                        <Form.Control
+                                                                            type="number"
+                                                                            size="sm"
+                                                                            min="0"
+                                                                            step="0.01"
+                                                                            max={vipTicket.price - 0.01}
+                                                                            value={earlyBird.price}
+                                                                            onChange={(e) => setEarlyBird({
+                                                                                ...earlyBird,
+                                                                                price: parseFloat(e.target.value) || 0
+                                                                            })}
+                                                                        />
+                                                                    </Form.Group>
+                                                                </Col>
+                                                            </Row>
+                                                            <small className="text-muted">
+                                                                First {earlyBird.quantity} VIP tickets: <strong>${earlyBird.price.toFixed(2)}</strong><br />
+                                                                Remaining {vipTicket.capacity - earlyBird.quantity}: <strong>${vipTicket.price.toFixed(2)}</strong>
+                                                            </small>
+                                                        </div>
+                                                    )}
+                                                </div>
                                             </>
                                         )}
                                     </Card.Body>
