@@ -391,6 +391,20 @@ const EventDetailsPage: React.FC = () => {
                     </Button>
                 </Modal.Footer>
             </Modal>
+
+            {/* Payment Modal for Paid Tickets */}
+            {selectedTicket && event && (
+                <PaymentModal
+                    show={showPaymentModal}
+                    onHide={() => setShowPaymentModal(false)}
+                    ticketName={selectedTicket.name}
+                    ticketPrice={Number(selectedTicket.price)}
+                    quantity={quantity}
+                    eventName={event.title}
+                    onPaymentComplete={doBooking}
+                    loading={bookingLoading}
+                />
+            )}
         </Container>
     );
 };
