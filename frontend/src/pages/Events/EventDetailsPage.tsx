@@ -12,6 +12,7 @@ import { isYouTubeUrl, getYouTubeVideoId, getYouTubeEmbedUrl } from '../../utils
 import { formatPrice } from '../../utils/priceFormat';
 import LoadingSpinner from '../../components/Common/LoadingSpinner';
 import ErrorAlert from '../../components/Common/ErrorAlert';
+import PaymentModal from '../../components/Payment/PaymentModal';
 
 const EventDetailsPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
@@ -20,6 +21,7 @@ const EventDetailsPage: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [showBookingModal, setShowBookingModal] = useState(false);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [selectedTicket, setSelectedTicket] = useState<TicketType | null>(null);
     const [quantity, setQuantity] = useState(1);
     const [bookingLoading, setBookingLoading] = useState(false);
@@ -72,6 +74,21 @@ const EventDetailsPage: React.FC = () => {
             return;
         }
 
+        // Check if ticket is paid
+        const ticketPrice = Number(selectedTicket.price);
+        if (ticketPrice > 0) {
+            // Show payment modal for paid tickets
+            setShowBookingModal(false);
+            setShowPaymentModal(true);
+        } else {
+            // Book directly for free tickets
+            await doBooking();
+        }
+    };
+
+    const doBooking = async () => {
+        if (!selectedTicket || !event) return;
+
         setBookingLoading(true);
         setError('');
         try {
@@ -82,6 +99,7 @@ const EventDetailsPage: React.FC = () => {
             });
             setBookingSuccess('Booking successful! Check your bookings page.');
             setShowBookingModal(false);
+            setShowPaymentModal(false);
             loadEvent(); // Reload to update availability
         } catch (err: any) {
             setError(extractErrorMessage(err, 'Failed to book ticket. Please try again.'));
