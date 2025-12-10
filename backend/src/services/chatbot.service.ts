@@ -508,7 +508,7 @@ export class ChatbotService {
                     message: `🎉 **Booking Confirmed!**\n\nYour tickets for **${state.eventName}** are booked!\n\n📋 **Reference:** ${booking.bookingReference}\n\nYou can view your booking in "My Bookings".\n\nAnything else I can help with?`,
                     suggestions: ['Show me events', 'Help'],
                     actions: [
-                        { type: 'navigate', label: 'View My Bookings', target: '/bookings' }
+                        { type: 'navigate', label: 'View My Bookings', target: '/attendee/bookings' }
                     ]
                 };
             } catch (error: any) {
@@ -617,7 +617,7 @@ export class ChatbotService {
                 message: "❌ **Cancel a Booking**\n\n1. Go to \"My Bookings\"\n2. Find the event you want to cancel\n3. Click \"Cancel Booking\"\n\n⚠️ **Note:** Cancellation policies may vary by event. Cancelled tickets may free up spots for others on the waitlist.",
                 suggestions: ['Show me events', 'My bookings'],
                 actions: [
-                    { type: 'navigate', label: 'My Bookings', target: '/bookings' }
+                    { type: 'navigate', label: 'My Bookings', target: '/attendee/bookings' }
                 ]
             };
         }
@@ -652,7 +652,7 @@ export class ChatbotService {
                 message: "📜 **Booking History**\n\nYou can see all your past and upcoming bookings in \"My Bookings\".\n\nThis includes:\n• Event details\n• Booking reference\n• Status (confirmed, cancelled, attended)",
                 suggestions: ['My bookings', 'Show me events'],
                 actions: userId ? [
-                    { type: 'navigate', label: 'View My Bookings', target: '/bookings' }
+                    { type: 'navigate', label: 'View My Bookings', target: '/attendee/bookings' }
                 ] : [
                     { type: 'navigate', label: 'Sign In', target: '/login' }
                 ]
