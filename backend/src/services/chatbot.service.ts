@@ -809,7 +809,7 @@ export class ChatbotService {
                 message: "🎫 **Your Bookings**\n\nView all your tickets and booking history in \"My Bookings\".\n\nYou can see:\n• Upcoming events\n• Past events\n• Booking status\n• Cancel bookings",
                 suggestions: ['Show me events', 'Help'],
                 actions: [
-                    { type: 'navigate', label: 'View My Bookings', target: '/bookings' }
+                    { type: 'navigate', label: 'View My Bookings', target: '/attendee/bookings' }
                 ]
             };
         }
