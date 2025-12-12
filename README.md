@@ -812,20 +812,12 @@ Built with ❤️ using TypeScript, React, Node.js, and PostgreSQL
 ## 🙏 Acknowledgments
 
 - React Bootstrap for UI components
-- TypeORM for excellent database abstraction
+- TypeORM for database abstraction
 - Vite for blazing-fast development experience
 - The open-source community for amazing tools and libraries
 
 ---
 
-## 📞 Support
-
-If you have any questions or need help, please:
-- Open an issue on GitHub
-- Check the [Troubleshooting Guide](./TROUBLESHOOTING_GUIDE.md)
-- Review the [API Documentation](./API_REFERENCE.md)
-
----
 
 <div align="center">
 
