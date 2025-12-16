@@ -114,6 +114,27 @@ const EventDetailsPage: React.FC = () => {
         }
     };
 
+    const handleReportEvent = async () => {
+        if (!event || !reportReason.trim()) {
+            setError('Please provide a reason for reporting this event.');
+            return;
+        }
+
+        setReportLoading(true);
+        setError('');
+        try {
+            await eventsApi.reportEvent(event.id, reportReason.trim());
+            setReportSuccess('Event reported successfully. Our team will review it.');
+            setShowReportModal(false);
+            setReportReason('');
+            loadEvent(); // Reload to update isReported status
+        } catch (err: any) {
+            setError(extractErrorMessage(err, 'Failed to report event. Please try again.'));
+        } finally {
+            setReportLoading(false);
+        }
+    };
+
     if (loading) return <LoadingSpinner />;
     if (!event) return <Container className="py-5"><Alert variant="danger">Event not found</Alert></Container>;
 
