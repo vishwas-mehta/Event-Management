@@ -449,6 +449,40 @@ const EventDetailsPage: React.FC = () => {
                     loading={bookingLoading}
                 />
             )}
+
+            {/* Report Event Modal */}
+            <Modal show={showReportModal} onHide={() => setShowReportModal(false)}>
+                <Modal.Header closeButton>
+                    <Modal.Title>Report Event</Modal.Title>
+                </Modal.Header>
+                <Modal.Body>
+                    <p className="text-muted mb-3">
+                        Please describe why you are reporting this event. Our team will review your report.
+                    </p>
+                    <Form.Group>
+                        <Form.Label>Reason for Reporting</Form.Label>
+                        <Form.Control
+                            as="textarea"
+                            rows={4}
+                            placeholder="e.g., Inappropriate content, misleading information, suspected fraud..."
+                            value={reportReason}
+                            onChange={(e) => setReportReason(e.target.value)}
+                        />
+                    </Form.Group>
+                </Modal.Body>
+                <Modal.Footer>
+                    <Button variant="secondary" onClick={() => setShowReportModal(false)}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="danger"
+                        onClick={handleReportEvent}
+                        disabled={reportLoading || !reportReason.trim()}
+                    >
+                        {reportLoading ? 'Submitting...' : 'Submit Report'}
+                    </Button>
+                </Modal.Footer>
+            </Modal>
         </Container>
     );
 };
