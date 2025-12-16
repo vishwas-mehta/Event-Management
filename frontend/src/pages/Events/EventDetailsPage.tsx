@@ -146,6 +146,11 @@ const EventDetailsPage: React.FC = () => {
                     {bookingSuccess}
                 </Alert>
             )}
+            {reportSuccess && (
+                <Alert variant="success" dismissible onClose={() => setReportSuccess('')}>
+                    {reportSuccess}
+                </Alert>
+            )}
 
             {/* Event Media - Banner Image and/or Video */}
             {(event.bannerImage || event.teaserVideo) && (
