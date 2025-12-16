@@ -247,6 +247,18 @@ const EventDetailsPage: React.FC = () => {
                         <p className="mb-2">
                             <strong><i className="bi bi-people me-2"></i>Capacity:</strong> {event.capacity}
                         </p>
+
+                        {/* Report Event Button - only for logged-in attendees */}
+                        {user?.role === UserRole.ATTENDEE && (
+                            <Button
+                                variant="outline-danger"
+                                size="sm"
+                                className="mt-2"
+                                onClick={() => setShowReportModal(true)}
+                            >
+                                <i className="bi bi-flag me-1"></i> Report Event
+                            </Button>
+                        )}
                     </div>
 
                     <Card className="mb-4">
