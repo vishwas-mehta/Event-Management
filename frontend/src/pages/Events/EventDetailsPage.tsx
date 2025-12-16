@@ -27,6 +27,12 @@ const EventDetailsPage: React.FC = () => {
     const [bookingLoading, setBookingLoading] = useState(false);
     const [bookingSuccess, setBookingSuccess] = useState('');
 
+    // Report event state
+    const [showReportModal, setShowReportModal] = useState(false);
+    const [reportReason, setReportReason] = useState('');
+    const [reportLoading, setReportLoading] = useState(false);
+    const [reportSuccess, setReportSuccess] = useState('');
+
     useEffect(() => {
         if (id) {
             loadEvent();
