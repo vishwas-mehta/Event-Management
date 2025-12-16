@@ -333,6 +333,19 @@ const MyBookingsPage: React.FC = () => {
                                     onChange={(e) => setReviewForm({ ...reviewForm, comment: e.target.value })}
                                 />
                             </Form.Group>
+
+                            <Form.Group className="mb-3">
+                                <Form.Label>Image URL (Optional)</Form.Label>
+                                <Form.Control
+                                    type="url"
+                                    placeholder="https://example.com/your-image.jpg"
+                                    value={reviewForm.imageUrl}
+                                    onChange={(e) => setReviewForm({ ...reviewForm, imageUrl: e.target.value })}
+                                />
+                                <Form.Text className="text-muted">
+                                    Add a link to an image from your event experience
+                                </Form.Text>
+                            </Form.Group>
                         </>
                     )}
                 </Modal.Body>
