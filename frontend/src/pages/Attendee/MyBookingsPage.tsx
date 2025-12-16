@@ -26,7 +26,7 @@ const MyBookingsPage: React.FC = () => {
     // Review modal state
     const [showReviewModal, setShowReviewModal] = useState(false);
     const [reviewBooking, setReviewBooking] = useState<BookingType | null>(null);
-    const [reviewForm, setReviewForm] = useState<ReviewFormData>({ rating: 5, comment: '' });
+    const [reviewForm, setReviewForm] = useState<ReviewFormData>({ rating: 5, comment: '', imageUrl: '' });
     const [reviewLoading, setReviewLoading] = useState(false);
     const [reviewError, setReviewError] = useState('');
 
@@ -79,7 +79,7 @@ const MyBookingsPage: React.FC = () => {
 
     const openReviewModal = (booking: BookingType) => {
         setReviewBooking(booking);
-        setReviewForm({ rating: 5, comment: '' });
+        setReviewForm({ rating: 5, comment: '', imageUrl: '' });
         setReviewError('');
         setShowReviewModal(true);
     };
@@ -96,10 +96,18 @@ const MyBookingsPage: React.FC = () => {
         setReviewError('');
 
         try {
-            await attendeeApi.createReview(reviewBooking.eventId, {
+            // Build review data with optional mediaFiles
+            const reviewData: { rating: number; comment?: string; mediaFiles?: string[] } = {
                 rating: reviewForm.rating,
                 comment: reviewForm.comment,
-            });
+            };
+
+            // Add image URL to mediaFiles if provided
+            if (reviewForm.imageUrl.trim()) {
+                reviewData.mediaFiles = [reviewForm.imageUrl.trim()];
+            }
+
+            await attendeeApi.createReview(reviewBooking.eventId, reviewData);
             setShowReviewModal(false);
             setSuccess('Thank you for your review!');
             loadBookings();
