@@ -13,6 +13,7 @@ import ErrorAlert from '../../components/Common/ErrorAlert';
 interface ReviewFormData {
     rating: number;
     comment: string;
+    imageUrl: string;
 }
 
 const MyBookingsPage: React.FC = () => {
