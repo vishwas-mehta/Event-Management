@@ -11,16 +11,31 @@ import { User } from './User.entity';
 import { Event } from './Event.entity';
 import { TicketType } from './TicketType.entity';
 
+/**
+ * Enum representing the possible statuses of a booking.
+ * @enum {string}
+ */
 export enum BookingStatus {
+    /** Booking is confirmed and active */
     CONFIRMED = 'confirmed',
+    /** Booking has been cancelled by the user */
     CANCELLED = 'cancelled',
+    /** User has attended the event */
     ATTENDED = 'attended',
 }
 
+/**
+ * Enum representing the payment status for a booking.
+ * @enum {string}
+ */
 export enum PaymentStatus {
+    /** Payment is pending processing */
     PENDING = 'pending',
+    /** Payment has been successfully completed */
     COMPLETED = 'completed',
+    /** Payment processing failed */
     FAILED = 'failed',
+    /** Payment has been refunded to the user */
     REFUNDED = 'refunded',
 }
 
