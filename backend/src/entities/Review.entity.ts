@@ -11,6 +11,11 @@ import {
 import { User } from './User.entity';
 import { Event } from './Event.entity';
 
+/**
+ * Review Entity - Represents a user's review of an attended event.
+ * Users can only review events they have attended, and each user
+ * can only submit one review per event (enforced by unique constraint).
+ */
 @Entity('reviews')
 @Unique(['userId', 'eventId'])
 export class Review {
