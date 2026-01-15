@@ -1,0 +1,1209 @@
+================================================================================
+                    FRONTEND EXPLAINED - EVENTHUB APPLICATION
+                     Complete React Frontend Documentation
+================================================================================
+
+================================================================================
+PART 1: PROJECT SETUP - FROM SCRATCH
+================================================================================
+
+1.1 CREATING THE FRONTEND FOLDER
+---------------------------------
+This project uses Vite (a fast build tool) with React and TypeScript.
+
+To create a similar frontend from scratch, you would run:
+
+    npm create vite@latest frontend -- --template react-ts
+    cd frontend 
+
+This creates a new Vite project with React and TypeScript template.
+
+
+1.2 INSTALLING ALL DEPENDENCIES
+--------------------------------
+After creating the project, install all required packages:
+
+Core Dependencies (production):
+    npm install react react-dom                    # Core React library
+    npm install react-router-dom                   # For navigation/routing
+    npm install axios                              # For HTTP API calls
+    npm install bootstrap react-bootstrap          # UI component library
+    npm install bootstrap-icons                    # Icon library
+    npm install date-fns                           # Date formatting utilities
+    npm install react-hook-form                    # Form handling
+    npm install lucide-react                       # Additional icons
+
+Development Dependencies (already included by Vite):
+    npm install -D typescript @types/react @types/react-dom
+    npm install -D vite @vitejs/plugin-react
+    npm install -D eslint @eslint/js typescript-eslint
+
+Full npm install command to replicate this project:
+    npm install axios bootstrap bootstrap-icons date-fns lucide-react react react-dom react-bootstrap react-hook-form react-router-dom
+
+
+1.3 CONFIGURATION FILES
+------------------------
+vite.config.ts - Build tool configuration:
+    - Sets development server to port 3000
+    - Proxies /api requests to backend at localhost:5000
+    - Configures path alias @ for src directory
+
+.env file:
+    VITE_API_URL=http://localhost:5000/api  (or leave empty to use default)
+
+
+================================================================================
+PART 2: APPLICATION STARTING POINT - HOW IT RENDERS
+================================================================================
+
+2.1 THE RENDERING CHAIN (Step by Step)
+---------------------------------------
+
+STEP 1: index.html (Entry HTML file)
+    Location: /frontend/index.html
+    
+    This is the ONLY HTML file. It contains:
+    - A single <div id="root"></div> where React mounts
+    - A script tag loading src/main.tsx
+    
+    Flow: Browser loads index.html → loads main.tsx → React takes over
+
+
+STEP 2: main.tsx (JavaScript Entry Point)
+    Location: /frontend/src/main.tsx
+    
+    What it does:
+    1. Imports React and ReactDOM
+    2. Imports CSS: Bootstrap CSS, custom index.css, Bootstrap icons
+    3. Finds the #root div in index.html
+    4. Renders the <App /> component inside React.StrictMode
+    
+    Code explanation:
+        ReactDOM.createRoot(document.getElementById('root')!).render(
+            <React.StrictMode>
+                <App />           ← This is where everything starts
+            </React.StrictMode>,
+        )
+
+
+STEP 3: App.tsx (Main Application Component)
+    Location: /frontend/src/App.tsx
+    
+    Structure:
+        <BrowserRouter>            ← Enables URL-based navigation
+            <AuthProvider>         ← Provides authentication state to ALL components
+                <AppRoutes />      ← Defines which page shows for which URL
+                <Chatbot />        ← Floating chatbot widget (always visible)
+            </AuthProvider>
+        </BrowserRouter>
+    
+    Key concept: Everything is wrapped in AuthProvider, so any component
+    in the app can know if user is logged in, who they are, and their role.
+
+
+2.2 THE ROUTING SYSTEM (What Page Shows When)
+----------------------------------------------
+
+App.tsx defines ALL routes using React Router's <Routes> and <Route>:
+
+PUBLIC ROUTES (anyone can access):
+    /               → HomePage         (landing page with hero section)
+    /login          → LoginPage        (login form)
+    /register       → RegisterPage     (registration form)
+    /events         → EventsPage       (browse all events)
+    /events/:id     → EventDetailsPage (single event details)
+
+ADMIN ROUTES (role=admin only):
+    /admin/dashboard           → AdminDashboard
+    /admin/users              → ManageUsersPage
+    /admin/organizers/pending → PendingOrganizersPage
+    /admin/reports            → ReportedEventsPage
+
+ORGANIZER ROUTES (role=organizer only):
+    /organizer/dashboard       → OrganizerDashboard
+    /organizer/events/create   → CreateEventPage
+    /organizer/events/:id/edit → EditEventPage
+    /organizer/events/:id/manage → ManageEventPage
+
+ATTENDEE ROUTES (role=attendee only):
+    /attendee/dashboard → AttendeeDashboard
+    /attendee/bookings  → MyBookingsPage
+
+SHARED PROTECTED ROUTE:
+    /profile → ProfilePage (any logged-in user)
+
+CATCH-ALL:
+    /* → Redirects to home page
+
+
+2.3 HOW PROTECTED ROUTES WORK
+------------------------------
+
+Every protected route is wrapped like this:
+    <MainLayout>
+        <ProtectedRoute allowedRoles={[UserRole.ATTENDEE]}>
+            <AttendeeDashboard />
+        </ProtectedRoute>
+    </MainLayout>
+
+ProtectedRoute component (src/components/Common/ProtectedRoute.tsx):
+    1. Shows loading spinner while authentication is being checked
+    2. If no user logged in → redirects to /login
+    3. If user status is not 'active' → shows "Pending Approval" message
+    4. If user role not in allowedRoles → shows "Access Denied"
+    5. Otherwise → renders the child component
+
+MainLayout component (src/components/Layout/MainLayout.tsx):
+    Wraps every page with:
+        <div>
+            <Navbar />    ← Top navigation bar
+            <main>        ← Page content goes here
+                {children}
+            </main>
+            <Footer />    ← Bottom footer
+        </div>
+
+
+================================================================================
+PART 3: FOLDER STRUCTURE EXPLAINED
+================================================================================
+
+frontend/src/
+├── main.tsx              # Entry point - mounts React app
+├── App.tsx               # Main component with routing
+├── index.css             # Global CSS styles
+├── App.css               # App-specific styles
+│
+├── api/                  # API LAYER - Backend communication
+│   ├── axios.ts          # Configured axios instance with auth headers
+│   ├── auth.api.ts       # Login, register, profile APIs
+│   ├── events.api.ts     # Get events, categories, report event APIs
+│   ├── attendee.api.ts   # Book ticket, my bookings, reviews APIs
+│   ├── organizer.api.ts  # Create/edit events, manage attendees APIs
+│   └── admin.api.ts      # User management, approve organizers APIs
+│
+├── contexts/             # GLOBAL STATE
+│   └── AuthContext.tsx   # User authentication state (logged in user, token)
+│
+├── types/                # TYPESCRIPT TYPES
+│   └── index.ts          # All interfaces: User, Event, Booking, etc.
+│
+├── utils/                # HELPER FUNCTIONS
+│   ├── dateFormat.ts     # Format dates for display
+│   ├── priceFormat.ts    # Format prices ($0.00 or "Free")
+│   ├── errorHelper.ts    # Extract error messages from API responses
+│   ├── mediaHelper.ts    # YouTube URL detection and embedding
+│   └── validation.ts     # Form validation helpers
+│
+├── components/           # REUSABLE UI COMPONENTS
+│   ├── Common/           # Shared components used everywhere
+│   │   ├── LoadingSpinner.tsx   # Spinning loader
+│   │   ├── ErrorAlert.tsx       # Error message display
+│   │   ├── Pagination.tsx       # Page navigation (1, 2, 3...)
+│   │   └── ProtectedRoute.tsx   # Route guard for auth
+│   │
+│   ├── Layout/           # Page layout components
+│   │   ├── MainLayout.tsx       # Navbar + content + Footer wrapper
+│   │   ├── Navbar.tsx           # Top navigation bar
+│   │   └── Footer.tsx           # Bottom footer
+│   │
+│   ├── Events/           # Event-related components
+│   │   └── EventCard.tsx        # Event card for listings
+│   │
+│   ├── Payment/          # Payment components
+│   │   └── PaymentModal.tsx     # Dummy payment modal for paid tickets
+│   │
+│   └── Chatbot/          # Chatbot components
+│       └── Chatbot.tsx          # Floating chatbot widget
+│
+└── pages/                # PAGE COMPONENTS (full page views)
+    ├── Home/
+    │   └── HomePage.tsx         # Landing page with hero section
+    │
+    ├── Auth/
+    │   ├── LoginPage.tsx        # Login form
+    │   └── RegisterPage.tsx     # Registration form
+    │
+    ├── Events/
+    │   ├── EventsPage.tsx       # Browse events with filters
+    │   └── EventDetailsPage.tsx # Single event view with booking
+    │
+    ├── Attendee/
+    │   ├── AttendeeDashboard.tsx # Attendee home with stats
+    │   └── MyBookingsPage.tsx    # All user bookings
+    │
+    ├── Organizer/
+    │   ├── OrganizerDashboard.tsx # Organizer home with stats
+    │   ├── CreateEventPage.tsx    # Create new event form
+    │   ├── EditEventPage.tsx      # Edit existing event
+    │   └── ManageEventPage.tsx    # Manage event attendees
+    │
+    ├── Admin/
+    │   ├── AdminDashboard.tsx     # Admin home with stats
+    │   ├── ManageUsersPage.tsx    # View/manage all users
+    │   ├── PendingOrganizersPage.tsx # Approve organizer requests
+    │   └── ReportedEventsPage.tsx # Handle reported events
+    │
+    └── Profile/
+        └── ProfilePage.tsx        # Edit user profile
+
+
+================================================================================
+PART 4: REUSABLE COMPONENTS EXPLAINED
+================================================================================
+
+4.1 LAYOUT COMPONENTS
+----------------------
+
+MainLayout.tsx - Page wrapper
+    Purpose: Wraps every page to show consistent Navbar and Footer
+    Usage: <MainLayout><SomePage /></MainLayout>
+    How it works: Uses {children} prop to render any page content between 
+    Navbar and Footer
+
+Navbar.tsx - Top navigation
+    Purpose: Shows navigation links based on user role
+    Features:
+    - Always shows: "EventHub" brand, "Browse Events"
+    - If logged out: shows "Login" and "Sign Up" buttons
+    - If logged in: shows Dashboard link, user dropdown with profile/logout
+    - Attendee sees: "My Bookings" link
+    - Organizer sees: "Create Event" link
+    - Admin sees: "Pending Approvals" link
+    How role checking works: Uses useAuth() hook to get user, then checks 
+    user.role to conditionally render links
+
+Footer.tsx - Bottom footer
+    Purpose: Shows copyright and links
+    Static: Same for all users
+
+
+4.2 UTILITY COMPONENTS
+-----------------------
+
+LoadingSpinner.tsx
+    Purpose: Shows spinning animation while data loads
+    Props: fullScreen (boolean) - if true, centers spinner on full page
+    Usage: {loading && <LoadingSpinner />}
+
+ErrorAlert.tsx
+    Purpose: Shows error message in Bootstrap alert
+    Props: message (string), onClose (function)
+    Usage: {error && <ErrorAlert message={error} onClose={() => setError('')} />}
+
+Pagination.tsx
+    Purpose: Shows page numbers for navigating lists
+    Props: currentPage, totalPages, onPageChange
+    Usage: <Pagination currentPage={1} totalPages={5} onPageChange={handlePage} />
+
+ProtectedRoute.tsx
+    Purpose: Guards routes from unauthorized access
+    Props: children, allowedRoles (array), requireActive
+    Logic: Checks auth state, redirects if needed, renders children if OK
+
+
+4.3 EVENT COMPONENTS
+---------------------
+
+EventCard.tsx
+    Purpose: Displays event summary in a card format (used in listings)
+    Props: event (EventType object)
+    Shows: Banner image, category badge, price, title, date, location, rating
+    Features:
+    - Shows "SOLD OUT" badge if no tickets available
+    - Shows "Free" badge if price is 0
+    - Links to /events/${event.id} on click
+
+
+4.4 PAYMENT COMPONENTS
+-----------------------
+
+PaymentModal.tsx
+    Purpose: Shows Razorpay-style payment modal for paid tickets
+    Props: show, onHide, ticketName, ticketPrice, quantity, eventName, 
+           onPaymentComplete, loading
+    Features:
+    - Shows order summary with ticket price, quantity, convenience fee, total
+    - Dummy payment options (UPI, Card, Net Banking, Wallets)
+    - Calls onPaymentComplete when user "pays"
+
+
+================================================================================
+PART 5: DEEP DIVE - ATTENDEE FLOW (COMPLETE WALKTHROUGH)
+================================================================================
+
+This section explains EVERY step of what happens when an Attendee user
+uses the application, from opening the app to booking a ticket.
+
+================================================================================
+5.1 OPENING THE APPLICATION (What Renders First)
+================================================================================
+
+When user opens http://localhost:3000:
+
+STEP 1: Browser loads index.html
+    - Renders empty <div id="root"></div>
+    - Loads main.tsx script
+
+STEP 2: main.tsx executes
+    - Imports bootstrap and custom CSS (styles load)
+    - Calls ReactDOM.createRoot() on #root element
+    - Renders <App /> component
+
+STEP 3: App component renders
+    Structure rendered:
+        <BrowserRouter>
+            <AuthProvider>           ← This runs first
+                <AppRoutes />        ← Then this
+                <Chatbot />
+            </AuthProvider>
+        </BrowserRouter>
+
+STEP 4: AuthProvider initializes (from AuthContext.tsx)
+    What happens:
+    1. Creates state: user=null, token=localStorage.getItem('token'), loading=true
+    2. useEffect triggers immediately (runs loadUser function)
+    3. If token exists in localStorage:
+       - Calls authApi.getCurrentUser() → makes HTTP GET to /api/auth/me
+       - If successful: sets user state with returned user data
+       - If fails: removes invalid token from localStorage
+    4. Sets loading=false
+
+STEP 5: AppRoutes component renders
+    - URL is "/" so matches: <Route path="/" element={<MainLayout><HomePage /></MainLayout>} />
+    - MainLayout renders Navbar + HomePage + Footer
+
+STEP 6: HomePage renders
+    - Shows hero section with "Discover & Book Amazing Events"
+    - Shows feature cards and "How it works" section
+    - If not logged in, shows "Start for Free" button
+
+WHAT USER SEES:
+    - Top: Dark navbar with "EventHub" logo, "Browse Events", "Login", "Sign Up"
+    - Middle: Beautiful landing page with hero image and text
+    - Bottom: Footer with links
+
+
+================================================================================
+5.2 REGISTRATION FLOW (Creating an Attendee Account)
+================================================================================
+
+User clicks "Sign Up" button → Browser navigates to /register
+
+STEP 1: Route matches
+    <Route path="/register" element={<MainLayout><RegisterPage /></MainLayout>} />
+
+STEP 2: RegisterPage component renders (from pages/Auth/RegisterPage.tsx)
+    - Creates form state with useState:
+        formData = { email, password, confirmPassword, firstName, lastName, 
+                     phoneNumber, role: 'attendee' }
+        error = ''
+        success = ''
+        loading = false
+
+STEP 3: User fills form and selects "Attend events" option (role='attendee')
+
+STEP 4: User clicks "Create account" button → handleSubmit runs:
+    
+    a) Form validation:
+        - Check if passwords match
+        - Check password length >= 6
+        
+    b) If validation passes:
+        setLoading(true);
+        await register({...formData});  ← Uses useAuth() hook's register function
+        navigate('/');  ← Redirects to home page
+
+STEP 5: register() function in AuthContext.tsx:
+    
+    const register = async (data: RegisterData) => {
+        const response = await authApi.register(data);  ← API call
+        const { user: userData, token: userToken } = response.data;
+        
+        // For attendee (status='active'), auto-login:
+        localStorage.setItem('token', userToken);
+        setToken(userToken);
+        setUser(userData);
+    };
+
+STEP 6: authApi.register() in api/auth.api.ts:
+    
+    register: async (data: RegisterData) => {
+        const response = await api.post('/auth/register', data);
+        return response.data;
+    }
+
+STEP 7: api.post() in api/axios.ts:
+    - Uses configured axios instance
+    - BaseURL: http://localhost:5000/api
+    - Makes POST to http://localhost:5000/api/auth/register
+    - Body: { email, password, firstName, lastName, role: 'attendee', phoneNumber }
+
+STEP 8: Backend processes request and returns:
+    {
+        success: true,
+        message: "Registration successful",
+        data: {
+            user: { id, email, firstName, lastName, role: 'attendee', status: 'active' },
+            token: "jwt.token.here"
+        }
+    }
+
+STEP 9: Frontend stores token and user:
+    - localStorage.setItem('token', 'jwt.token.here')
+    - setUser(userData) → triggers re-render
+    - navigate('/') → redirects to homepage
+
+STEP 10: App re-renders with authenticated user
+    - AuthContext now has user object
+    - Navbar re-renders showing user name dropdown instead of Login/Sign Up
+    - User sees: Dashboard link, My Bookings link, user dropdown
+
+
+================================================================================
+5.3 LOGIN FLOW (Existing Attendee Logging In)
+================================================================================
+
+User clicks "Login" in navbar → Browser navigates to /login
+
+STEP 1: LoginPage renders (from pages/Auth/LoginPage.tsx)
+    - Creates state: email='', password='', error='', loading=false
+    - Gets login function from useAuth() hook
+
+STEP 2: User enters email and password, clicks "Sign in"
+
+STEP 3: handleSubmit runs:
+    
+    e.preventDefault();  ← Prevents form from refreshing page
+    setError('');
+    setLoading(true);
+    
+    try {
+        await login({ email, password });  ← AuthContext's login function
+        navigate('/');  ← Success: go to home
+    } catch (err) {
+        setError(extractErrorMessage(err, 'Failed to login...'));
+    }
+    setLoading(false);
+
+STEP 4: login() in AuthContext:
+    
+    const login = async (credentials) => {
+        const response = await authApi.login(credentials);
+        const { user: userData, token: userToken } = response.data;
+        
+        localStorage.setItem('token', userToken);
+        setToken(userToken);
+        setUser(userData);
+    };
+
+STEP 5: API call to backend:
+    POST /api/auth/login
+    Body: { email: "user@example.com", password: "secret123" }
+
+STEP 6: Backend validates and returns:
+    {
+        success: true,
+        data: {
+            user: { id: "uuid", email: "...", firstName: "John", role: "attendee", ... },
+            token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        }
+    }
+
+STEP 7: Token stored, user state updated, redirected to home
+
+WHAT HAPPENS AFTER LOGIN:
+    - Every subsequent API call includes the token
+    - axios.ts interceptor adds: Authorization: Bearer <token>
+    - Backend validates token on protected routes
+
+
+================================================================================
+5.4 BROWSING EVENTS (EventsPage Flow)
+================================================================================
+
+User clicks "Browse Events" in navbar → navigates to /events
+
+STEP 1: EventsPage renders (from pages/Events/EventsPage.tsx)
+    
+    State initialization:
+        const [events, setEvents] = useState<EventType[]>([]);
+        const [categories, setCategories] = useState<CategoryType[]>([]);
+        const [loading, setLoading] = useState(true);
+        const [error, setError] = useState('');
+        const [filters, setFilters] = useState<EventFilters>({
+            page: 1, limit: 12, sortBy: 'date', order: 'ASC'
+        });
+        const [pagination, setPagination] = useState({...});
+
+STEP 2: useEffect hooks trigger on mount:
+    
+    useEffect(() => { loadCategories(); }, []);  ← Load categories once
+    useEffect(() => { loadEvents(); }, [filters]);  ← Load events when filters change
+
+STEP 3: loadCategories() function:
+    
+    const loadCategories = async () => {
+        const response = await eventsApi.getCategories();
+        setCategories(response.data.categories);
+    };
+    
+    API call: GET /api/events/categories
+
+STEP 4: loadEvents() function:
+    
+    setLoading(true);
+    const response = await eventsApi.getEvents(filters);
+    setEvents(response.data.events);
+    setPagination(response.data.pagination);
+    setLoading(false);
+
+STEP 5: eventsApi.getEvents() in api/events.api.ts:
+    
+    getEvents: async (filters) => {
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value) params.append(key, value.toString());
+        });
+        const response = await api.get(`/events?${params.toString()}`);
+        return response.data;
+    }
+    
+    API call: GET /api/events?page=1&limit=12&sortBy=date&order=ASC
+
+STEP 6: Backend returns:
+    {
+        success: true,
+        data: {
+            events: [
+                { id: "1", title: "Tech Conference", startDateTime: "...", ... },
+                { id: "2", title: "Music Festival", ... },
+                ...
+            ],
+            pagination: { total: 50, page: 1, limit: 12, totalPages: 5 }
+        }
+    }
+
+STEP 7: Component renders with data:
+    
+    - Left sidebar: Filter form (search, category, location, dates, checkboxes)
+    - Right side: Grid of EventCard components
+    - Bottom: Pagination component
+
+STEP 8: EventCard rendering (for each event):
+    
+    <Link to={`/events/${event.id}`}>
+        <Card>
+            <img src={event.bannerImage} />           ← Event image
+            <Badge>{event.category?.name}</Badge>     ← Category badge
+            <span>{getPriceRange()}</span>            ← Price or "Free"
+            <h5>{event.title}</h5>                    ← Event title
+            <span>{formatEventDateTime(...)}</span>   ← Date
+            <span>{event.location}</span>             ← Location
+        </Card>
+    </Link>
+
+FILTERING EVENTS:
+    When user changes a filter (eg. selects category):
+    
+    handleFilterChange('category', 'music');
+    ↓
+    setFilters({...filters, category: 'music', page: 1});
+    ↓
+    useEffect sees filters changed
+    ↓
+    loadEvents() runs again with new filters
+    ↓
+    New events render
+
+
+================================================================================
+5.5 VIEWING EVENT DETAILS (EventDetailsPage Flow)
+================================================================================
+
+User clicks on an EventCard → navigates to /events/abc123
+
+STEP 1: React Router matches route:
+    <Route path="/events/:id" element={<MainLayout><EventDetailsPage /></MainLayout>} />
+    
+    The :id becomes a route parameter (eg. "abc123")
+
+STEP 2: EventDetailsPage initializes (from pages/Events/EventDetailsPage.tsx):
+    
+    const { id } = useParams<{ id: string }>();  ← Gets "abc123" from URL
+    const { user } = useAuth();  ← Gets logged-in user
+    
+    State:
+        event = null
+        loading = true
+        error = ''
+        showBookingModal = false
+        selectedTicket = null
+        quantity = 1
+        bookingLoading = false
+        bookingSuccess = ''
+
+STEP 3: useEffect triggers loadEvent:
+    
+    useEffect(() => {
+        if (id) { loadEvent(); }
+    }, [id]);
+    
+    const loadEvent = async () => {
+        setLoading(true);
+        const response = await eventsApi.getEventById(id!);
+        setEvent(response.data.event);
+        setLoading(false);
+    };
+
+STEP 4: API call:
+    GET /api/events/abc123
+
+STEP 5: Backend returns full event with ticket types:
+    {
+        success: true,
+        data: {
+            event: {
+                id: "abc123",
+                title: "Tech Conference 2024",
+                description: "A great tech event...",
+                startDateTime: "2024-03-15T09:00:00Z",
+                endDateTime: "2024-03-15T17:00:00Z",
+                location: "Convention Center",
+                capacity: 500,
+                bannerImage: "https://...",
+                category: { id: "1", name: "Technology" },
+                organizer: { id: "...", firstName: "John", lastName: "Doe" },
+                ticketTypes: [
+                    { id: "t1", name: "General", price: 0, capacity: 400, sold: 150 },
+                    { id: "t2", name: "VIP", price: 99.00, capacity: 100, sold: 30 }
+                ],
+                reviews: [...],
+                averageRating: 4.5
+            }
+        }
+    }
+
+STEP 6: Page renders with event data:
+    
+    Layout:
+    ┌─────────────────────────────────────────────────────────────────┐
+    │  [Banner Image or YouTube Video]                                 │
+    ├─────────────────────────────────────────────────────┬───────────┤
+    │  Tech Conference 2024                               │ TICKETS   │
+    │  [Technology badge]                                  │           │
+    │                                                      │ General   │
+    │  📅 Date: Mar 15, 2024 • 09:00 AM                   │ Free      │
+    │  📍 Location: Convention Center                      │ Available:│
+    │  👤 Organizer: John Doe                             │ 250/400   │
+    │  👥 Capacity: 500                                    │ [Book Now]│
+    │                                                      │           │
+    │  ┌──────────────────────────────────────────────┐   │ VIP       │
+    │  │ About This Event                              │   │ $99.00    │
+    │  │ A great tech event...                         │   │ Available:│
+    │  └──────────────────────────────────────────────┘   │ 70/100    │
+    │                                                      │ [Book Now]│
+    │  ┌──────────────────────────────────────────────┐   │           │
+    │  │ Reviews (4.5 ★)                               │   └───────────┤
+    │  │ ★★★★★ John: Great event!                     │               │
+    │  │ ★★★★☆ Jane: Informative...                   │               │
+    │  └──────────────────────────────────────────────┘               │
+    └─────────────────────────────────────────────────────────────────┘
+
+TICKET DISPLAY LOGIC:
+    For each ticket type:
+    - If user.role === ATTENDEE and tickets available → Show "Book Now" button
+    - If tickets sold out → Show disabled "Sold Out" button
+    - If user not logged in → Show "Login to Book" button
+    - If user is organizer/admin → Show "Attendees only" text
+
+
+================================================================================
+5.6 BOOKING A TICKET (Complete Booking Flow)
+================================================================================
+
+SCENARIO: Attendee "John" wants to book 2 General tickets (free tickets)
+
+STEP 1: User clicks "Book Now" on General ticket
+    
+    handleBookTicket(ticket) is called:
+    
+    const handleBookTicket = (ticket: TicketType) => {
+        if (!user) {
+            alert('Please login to book tickets');
+            return;
+        }
+        setSelectedTicket(ticket);  ← Stores which ticket type
+        setQuantity(1);             ← Default to 1 ticket
+        setShowBookingModal(true);  ← Opens the booking modal
+    };
+
+STEP 2: Booking Modal opens
+    
+    Shows:
+    - Ticket Type: General
+    - Price: Free
+    - Quantity input (1-250 allowed based on availability)
+    - Total: Free
+    - Cancel / Confirm Booking buttons
+
+STEP 3: User changes quantity to 2, clicks "Confirm Booking"
+    
+    confirmBooking() runs:
+    
+    const confirmBooking = async () => {
+        // Validation
+        const available = selectedTicket.capacity - selectedTicket.sold;
+        if (quantity > available) {
+            setError(`Only ${available} tickets available...`);
+            return;
+        }
+        
+        // Check if ticket is paid
+        const ticketPrice = Number(selectedTicket.price);
+        if (ticketPrice > 0) {
+            // Show payment modal for paid tickets
+            setShowBookingModal(false);
+            setShowPaymentModal(true);
+        } else {
+            // Book directly for free tickets
+            await doBooking();
+        }
+    };
+
+STEP 4: doBooking() executes (for free ticket):
+    
+    const doBooking = async () => {
+        setBookingLoading(true);
+        setError('');
+        
+        try {
+            await attendeeApi.bookTicket({
+                eventId: event.id,              // "abc123"
+                ticketTypeId: selectedTicket.id, // "t1"
+                quantity,                        // 2
+            });
+            
+            setBookingSuccess('Booking successful! Check your bookings page.');
+            setShowBookingModal(false);
+            loadEvent();  ← Reload to update availability
+        } catch (err) {
+            setError(extractErrorMessage(err, 'Failed to book ticket...'));
+        }
+        setBookingLoading(false);
+    };
+
+STEP 5: attendeeApi.bookTicket() in api/attendee.api.ts:
+    
+    bookTicket: async (data: BookingFormData) => {
+        const response = await api.post('/attendee/bookings', data);
+        return response.data;
+    }
+
+STEP 6: axios sends request (from api/axios.ts):
+    
+    POST http://localhost:5000/api/attendee/bookings
+    Headers:
+        Content-Type: application/json
+        Authorization: Bearer eyJhbGciOi...  ← Token from localStorage
+    Body:
+        { eventId: "abc123", ticketTypeId: "t1", quantity: 2 }
+
+STEP 7: Backend processes booking (what happens on server):
+    1. Validates JWT token → identifies user as John
+    2. Finds event and ticket type in database
+    3. Checks if enough tickets available
+    4. Creates Booking record in database
+    5. Updates ticket.sold count (+2)
+    6. Returns booking confirmation
+
+STEP 8: Backend response:
+    {
+        success: true,
+        message: "Booking created successfully",
+        data: {
+            booking: {
+                id: "booking-uuid",
+                userId: "john-uuid",
+                eventId: "abc123",
+                ticketTypeId: "t1",
+                quantity: 2,
+                totalPrice: 0,
+                status: "confirmed",
+                bookingReference: "EVT-ABC123-XYZ",
+                paymentStatus: "completed",
+                bookedAt: "2024-01-15T10:30:00Z",
+                event: { ... },
+                ticketType: { ... }
+            }
+        }
+    }
+
+STEP 9: Frontend updates:
+    - Modal closes
+    - Success alert shows: "Booking successful! Check your bookings page."
+    - loadEvent() reloads → ticket "sold" count updates from 150 to 152
+
+PAID TICKET FLOW (VIP ticket at $99):
+    If user clicks "Book Now" on VIP ticket:
+    - confirmBooking() detects price > 0
+    - Closes booking modal, opens PaymentModal
+    - PaymentModal shows:
+        * Order summary: VIP × 2 = $198.00 + $1 fee = $199.00
+        * Payment options (UPI, Card, etc.)
+    - User selects payment method, clicks "Proceed and Pay"
+    - PaymentModal calls onPaymentComplete → doBooking()
+    - Same booking flow as free ticket
+
+
+================================================================================
+5.7 ATTENDEE DASHBOARD (AttendeeDashboard.tsx)
+================================================================================
+
+User clicks "Dashboard" in navbar → /attendee/dashboard
+
+STEP 1: ProtectedRoute checks:
+    - User logged in? ✓
+    - User role is ATTENDEE? ✓
+    - User status is active? ✓
+    → Renders AttendeeDashboard
+
+STEP 2: Component initializes:
+    
+    const [bookings, setBookings] = useState<BookingType[]>([]);
+    const [loading, setLoading] = useState(true);
+    
+    useEffect(() => { loadBookings(); }, []);
+
+STEP 3: loadBookings():
+    
+    const loadBookings = async () => {
+        const response = await attendeeApi.getMyBookings();
+        setBookings(response.data.bookings);
+        setLoading(false);
+    };
+    
+    API: GET /api/attendee/bookings (with auth token)
+
+STEP 4: Calculate stats from bookings:
+    
+    const upcomingEvents = bookings.filter(
+        b => b.status === 'confirmed' && isEventUpcoming(b.event.startDateTime)
+    );
+    const pastEvents = bookings.filter(
+        b => isEventPast(b.event.endDateTime)
+    );
+
+STEP 5: Render dashboard:
+    
+    ┌────────────────────────────────────────────────────────────────┐
+    │  Welcome back!                                                  │
+    │  Here's an overview of your events                             │
+    ├───────────────────┬───────────────────┬────────────────────────┤
+    │     5             │       3           │         2              │
+    │  Total Bookings   │  Upcoming Events  │   Events Attended      │
+    ├───────────────────┴───────────────────┴────────────────────────┤
+    │  Upcoming Events                           [View All Bookings] │
+    │  ┌──────────────────────────────────────────────────────────┐ │
+    │  │ Tech Conference 2024                         2 Tickets   │ │
+    │  │ 📅 Mar 15, 2024 • 09:00 AM                              │ │
+    │  └──────────────────────────────────────────────────────────┘ │
+    │  ┌──────────────────────────────────────────────────────────┐ │
+    │  │ Music Festival                               1 Ticket    │ │
+    │  │ 📅 Mar 20, 2024 • 02:00 PM                              │ │
+    │  └──────────────────────────────────────────────────────────┘ │
+    └────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+5.8 MY BOOKINGS PAGE (MyBookingsPage.tsx)
+================================================================================
+
+User clicks "My Bookings" or "View All Bookings" → /attendee/bookings
+
+STEP 1: Same API call as dashboard to get all bookings
+
+STEP 2: Categorize bookings:
+    
+    const upcomingBookings = bookings.filter(b => 
+        b.status === 'confirmed' && startDate > now
+    );
+    const pastBookings = bookings.filter(b => 
+        b.status === 'attended' || (b.status === 'confirmed' && startDate <= now)
+    );
+    const cancelledBookings = bookings.filter(b => 
+        b.status === 'cancelled'
+    );
+
+STEP 3: Render booking cards with actions:
+    
+    UPCOMING BOOKING CARD:
+    ┌─────────────────────────────────────────────────┐
+    │ Tech Conference 2024              [Confirmed]   │
+    │ 📅 Mar 15, 2024 • 09:00 AM                      │
+    │ 📍 Convention Center                            │
+    │ Reference: EVT-ABC123-XYZ                       │
+    │ Ticket: General × 2                             │
+    │ Total: Free                                     │
+    │                                                 │
+    │ [Cancel Booking]  [View Event]                  │
+    └─────────────────────────────────────────────────┘
+    
+    PAST BOOKING (can mark attendance):
+    ┌─────────────────────────────────────────────────┐
+    │ Music Workshop                    [Confirmed]   │
+    │ 📅 Mar 01, 2024 (past)                         │
+    │ ...                                             │
+    │ [✓ Mark Attendance]  [View Event]               │
+    └─────────────────────────────────────────────────┘
+    
+    ATTENDED BOOKING (can leave review):
+    ┌─────────────────────────────────────────────────┐
+    │ Art Exhibition                    [Attended]    │
+    │ 📅 Feb 20, 2024                                │
+    │ ...                                             │
+    │ [⭐ Leave a Review]  [View Event]               │
+    └─────────────────────────────────────────────────┘
+
+CANCEL BOOKING FLOW:
+    User clicks "Cancel Booking":
+    1. confirm('Are you sure?') dialog
+    2. If confirmed: attendeeApi.cancelBooking(bookingId)
+    3. API: DELETE /api/attendee/bookings/{id}
+    4. Backend updates booking.status = 'cancelled', refunds capacity
+    5. loadBookings() refreshes list
+
+MARK ATTENDANCE FLOW:
+    User clicks "Mark Attendance":
+    1. attendeeApi.markAttendance(bookingId)
+    2. API: POST /api/attendee/bookings/{id}/attend
+    3. Backend updates booking.status = 'attended'
+    4. Success message: "Attendance marked! You can now leave a review."
+
+LEAVE REVIEW FLOW:
+    User clicks "Leave a Review":
+    1. Opens review modal with star rating and comment field
+    2. User selects 1-5 stars, writes comment
+    3. Clicks "Submit Review"
+    4. attendeeApi.createReview(eventId, { rating, comment })
+    5. API: POST /api/attendee/events/{eventId}/reviews
+    6. Success: "Thank you for your review!"
+
+
+================================================================================
+5.9 HOW THE API LAYER WORKS
+================================================================================
+
+All API calls go through: src/api/axios.ts
+
+AXIOS INSTANCE CONFIGURATION:
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+    
+    const api = axios.create({
+        baseURL: API_URL,
+        headers: { 'Content-Type': 'application/json' }
+    });
+
+REQUEST INTERCEPTOR (runs before every request):
+    api.interceptors.request.use((config) => {
+        const token = localStorage.getItem('token');
+        if (token) {
+            config.headers.Authorization = `Bearer ${token}`;
+        }
+        return config;
+    });
+    
+    This automatically adds the JWT token to every API call.
+
+RESPONSE INTERCEPTOR (runs for every response):
+    api.interceptors.response.use(
+        (response) => response,  ← Success: just return response
+        (error) => {
+            // Handle 401 errors (unauthorized)
+            if (error.response?.status === 401 && hasStoredToken && !isAuthEndpoint) {
+                localStorage.removeItem('token');
+                window.location.href = '/login';
+            }
+            return Promise.reject(error);
+        }
+    );
+    
+    If backend returns 401 (token expired), auto-logout and redirect to login.
+
+
+API MODULES:
+    Each file in src/api/ handles a specific domain:
+    
+    auth.api.ts:
+        - register(data) → POST /auth/register
+        - login(credentials) → POST /auth/login
+        - getCurrentUser() → GET /auth/me
+        - updateProfile(data) → PUT /auth/profile
+        - logout() → POST /auth/logout
+    
+    events.api.ts:
+        - getEvents(filters) → GET /events?...
+        - getEventById(id) → GET /events/{id}
+        - getCategories() → GET /events/categories
+        - reportEvent(id, reason) → POST /events/{id}/report
+        - getEventReviews(eventId) → GET /events/{id}/reviews
+    
+    attendee.api.ts:
+        - bookTicket(data) → POST /attendee/bookings
+        - getMyBookings() → GET /attendee/bookings
+        - cancelBooking(id) → DELETE /attendee/bookings/{id}
+        - markAttendance(id) → POST /attendee/bookings/{id}/attend
+        - createReview(eventId, data) → POST /attendee/events/{eventId}/reviews
+        - joinWaitlist(eventId) → POST /attendee/events/{eventId}/waitlist
+
+
+================================================================================
+PART 6: HIGH-LEVEL VIEW - ORGANIZER
+================================================================================
+
+ORGANIZER ROLE OVERVIEW:
+Organizers can create and manage events but need admin approval first.
+
+PAGES:
+    /organizer/dashboard - OrganizerDashboard.tsx
+        - Shows stats: total events, total bookings, upcoming events
+        - Lists all their events with quick actions
+        - Uses: organizerApi.getDashboard()
+    
+    /organizer/events/create - CreateEventPage.tsx
+        - Form to create new event
+        - Fields: title, description, category, dates, location, capacity, banner
+        - Creates ticket types with pricing
+        - Uses: organizerApi.createEvent()
+    
+    /organizer/events/:id/edit - EditEventPage.tsx
+        - Same form, pre-filled with existing event data
+        - Uses: organizerApi.getEvent(), organizerApi.updateEvent()
+    
+    /organizer/events/:id/manage - ManageEventPage.tsx
+        - View all bookings/attendees for an event
+        - Check-in attendees
+        - View stats and revenue
+
+KEY APIS:
+    organizer.api.ts:
+        - getDashboard() → GET /organizer/dashboard
+        - getMyEvents() → GET /organizer/events
+        - getEvent(id) → GET /organizer/events/{id}
+        - createEvent(data) → POST /organizer/events
+        - updateEvent(id, data) → PUT /organizer/events/{id}
+        - deleteEvent(id) → DELETE /organizer/events/{id}
+        - createTicketType(eventId, data) → POST /organizer/events/{id}/tickets
+        - getEventBookings(id) → GET /organizer/events/{id}/bookings
+
+ROUTE PROTECTION:
+    All organizer routes wrapped with:
+    <ProtectedRoute allowedRoles={[UserRole.ORGANIZER]}>
+
+
+================================================================================
+PART 7: HIGH-LEVEL VIEW - ADMIN
+================================================================================
+
+ADMIN ROLE OVERVIEW:
+Admins manage the entire platform - users, organizer approvals, reported content.
+
+PAGES:
+    /admin/dashboard - AdminDashboard.tsx
+        - Platform stats: total users, organizers, attendees, events, reports
+        - Uses: adminApi.getDashboardStats()
+    
+    /admin/users - ManageUsersPage.tsx
+        - List all users with search/filter
+        - Block/unblock users
+        - Uses: adminApi.getAllUsers(), adminApi.updateUserStatus()
+    
+    /admin/organizers/pending - PendingOrganizersPage.tsx
+        - List organizers with status='pending'
+        - Approve or reject buttons
+        - Uses: adminApi.getPendingOrganizers(), adminApi.approveOrganizer(), 
+                adminApi.rejectOrganizer()
+    
+    /admin/reports - ReportedEventsPage.tsx
+        - List events that have been reported
+        - Review report reason
+        - Take action: dismiss report or remove event
+        - Uses: adminApi.getReportedEvents(), adminApi.handleReport()
+
+KEY APIS:
+    admin.api.ts:
+        - getDashboardStats() → GET /admin/dashboard
+        - getAllUsers(params) → GET /admin/users
+        - updateUserStatus(id, status) → PATCH /admin/users/{id}/status
+        - getPendingOrganizers() → GET /admin/organizers/pending
+        - approveOrganizer(id) → POST /admin/organizers/{id}/approve
+        - rejectOrganizer(id) → POST /admin/organizers/{id}/reject
+        - getReportedEvents() → GET /admin/reports
+        - handleReport(id, action) → POST /admin/reports/{id}
+
+ROUTE PROTECTION:
+    All admin routes wrapped with:
+    <ProtectedRoute allowedRoles={[UserRole.ADMIN]}>
+
+
+================================================================================
+PART 8: UTILITY FUNCTIONS
+================================================================================
+
+src/utils/dateFormat.ts:
+    - formatEventDate(dateString) → "Mar 15, 2024"
+    - formatEventDateTime(dateString) → "Mar 15, 2024 • 09:00 AM"
+    - isEventPast(endDateTime) → true/false
+    - isEventUpcoming(startDateTime) → true/false
+    Uses: date-fns library for parsing and formatting
+
+src/utils/priceFormat.ts:
+    - formatPrice(price) → "$99.00" or "Free" if 0
+    - formatPriceRange(min, max) → "$10.00 - $99.00" or "Free" or "$50.00"
+
+src/utils/errorHelper.ts:
+    - extractErrorMessage(error, defaultMsg) → Gets human-readable error from API
+    Checks: error.response.data.message || error.message || defaultMsg
+
+src/utils/mediaHelper.ts:
+    - isYouTubeUrl(url) → true/false
+    - getYouTubeVideoId(url) → "dQw4w9WgXcQ"
+    - getYouTubeEmbedUrl(videoId) → "https://www.youtube.com/embed/..."
+
+src/utils/validation.ts:
+    - validateEmail, validatePassword, etc.
+
+
+================================================================================
+SUMMARY: KEY CONCEPTS
+================================================================================
+
+1. COMPONENT ARCHITECTURE:
+   - Pages are in /pages - full page views
+   - Components are in /components - reusable pieces
+   - APIs are in /api - backend communication
+   - State is in /contexts - global app state
+
+2. DATA FLOW:
+   User Action → Event Handler → API Function → Backend → Response → State Update → Re-render
+
+3. AUTHENTICATION:
+   - AuthContext provides user state to entire app
+   - Token stored in localStorage for persistence
+   - axios interceptor adds token to all requests
+   - ProtectedRoute component guards pages
+
+4. ROUTING:
+   - React Router handles URL-to-component mapping
+   - useNavigate() for programmatic navigation
+   - useParams() for getting URL parameters
+
+5. STATE MANAGEMENT:
+   - useState for component-local state
+   - useContext for global state (auth)
+   - useEffect for side effects and data fetching
+
+================================================================================
+END OF FRONTEND DOCUMENTATION
+================================================================================

@@ -1,0 +1,476 @@
+================================================================================
+          FULL-STACK FLOW #2: CHATBOT SYSTEM
+          End-to-End: Frontend → Backend → AI Response
+================================================================================
+
+This document explains the complete chatbot flow from UI to AI-powered response.
+
+================================================================================
+PART 1: WHAT THE USER SEES (FRONTEND UI)
+================================================================================
+
+CHATBOT UI (Floating widget on all pages):
+
+CLOSED STATE (Floating Button):
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                                                              │
+│  [Page Content]                                                              │
+│                                                                              │
+│                                                         ┌─────┐             │
+│                                                         │ 💬  │← FAB button │
+│                                                         └─────┘             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+OPEN STATE (Chat Window):
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                                                   ┌───────────────────────┐  │
+│                                                   │ Event Assistant   🔄 ✕│  │
+│                                                   ├───────────────────────┤  │
+│                                                   │ 🤖 Hello! I can help  │  │
+│                                                   │ you:                  │  │
+│                                                   │ • Book tickets        │  │
+│                                                   │ • Find events         │  │
+│                                                   │                       │  │
+│                                                   │ [Show events] [Help]  │← Suggestions │
+│                                                   │                       │  │
+│                                                   │ 👤 Book tickets       │← User msg │
+│                                                   │                       │  │
+│                                                   │ 🤖 Here are events:   │  │
+│                                                   │ 1. Concert...         │  │
+│                                                   │ [View All Events →]   │← Action button │
+│                                                   ├───────────────────────┤  │
+│                                                   │ [Type message...] [→] │  │
+│                                                   └───────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+PART 2: FRONTEND COMPONENTS
+================================================================================
+
+COMPONENT: Chatbot.tsx
+LOCATION: /frontend/src/components/Chatbot/Chatbot.tsx
+
+FEATURES:
+    - Floating action button (FAB) when closed
+    - Chat window with message history
+    - Suggestion chips (clickable quick actions)
+    - Action buttons (navigate to pages)
+    - Typing indicator during loading
+    - Conversation state for multi-turn booking
+
+
+KEY STATE:
+    const [isOpen, setIsOpen] = useState(false);         // Toggle chat window
+    const [messages, setMessages] = useState([...]);     // Message history
+    const [input, setInput] = useState('');              // User input
+    const [isLoading, setIsLoading] = useState(false);   // Show typing indicator
+    const [conversationState, setConversationState] = useState(null);  // Booking flow state
+    const [conversationHistory, setConversationHistory] = useState([]); // For context
+
+
+================================================================================
+PART 3: FRONTEND CODE FLOW
+================================================================================
+
+STEP 1: User Types Message and Presses Enter
+
+    const handleKeyPress = (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    };
+
+STEP 2: sendMessage() Function
+
+    const sendMessage = async (messageText) => {
+        const msgToSend = messageText || input;
+        if (!msgToSend.trim() || isLoading) return;
+
+        // Add user message to UI immediately
+        const userMessage = {
+            role: 'user',
+            content: msgToSend,
+            timestamp: new Date(),
+        };
+        setMessages(prev => [...prev, userMessage]);
+        setInput('');
+        setIsLoading(true);
+
+        // Build conversation history for context
+        const newHistory = [...conversationHistory, { role: 'user', message: msgToSend }];
+
+        try {
+            // Get auth token (if logged in)
+            const token = localStorage.getItem('token');
+            
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            // API call
+            const response = await fetch('/api/chatbot/chat', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                    message: msgToSend,
+                    conversationHistory: newHistory,
+                    conversationState,  // For multi-turn booking
+                }),
+            });
+
+            const data = await response.json();
+
+            // Update conversation state (for booking flow)
+            if (data.conversationState) {
+                setConversationState(data.conversationState);
+            }
+
+            // Add assistant message to UI
+            const assistantMessage = {
+                role: 'assistant',
+                content: data.message,
+                suggestions: data.suggestions,
+                actions: data.actions,
+            };
+            setMessages(prev => [...prev, assistantMessage]);
+
+        } catch (error) {
+            // Show error message
+        }
+        setIsLoading(false);
+    };
+
+STEP 3: Handling Actions (Navigation)
+
+    const handleAction = (action) => {
+        if (action.type === 'navigate') {
+            setIsOpen(false);          // Close chatbot
+            navigate(action.target);    // Go to page
+        }
+    };
+
+
+================================================================================
+PART 4: BACKEND FLOW
+================================================================================
+
+FILES INVOLVED:
+    /backend/src/routes/chatbot.routes.ts      ← Route definitions
+    /backend/src/controllers/chatbot.controller.ts ← Controller
+    /backend/src/services/chatbot.service.ts   ← Business logic
+    /backend/src/knowledge/chatbot_knowledge.txt ← Knowledge base
+
+
+REQUEST:
+    POST /api/chatbot/chat
+    Headers: Authorization: Bearer <token> (optional)
+    Body: {
+        message: "Book tickets for concert",
+        conversationHistory: [...],
+        conversationState: null
+    }
+
+
+STEP 1: chatbot.routes.ts
+
+    router.post('/chat', optionalAuthenticate, chatbotController.chat);
+    
+    optionalAuthenticate: Tries to parse JWT, but doesn't require it
+    - If valid token: req.user = { userId, role }
+    - If no token: req.user = undefined
+    
+    This allows chatbot to work for both logged-in and guest users
+
+
+STEP 2: ChatbotController.chat() (controller)
+
+    async chat(req, res) {
+        const { message, conversationHistory, conversationState } = req.body;
+        
+        if (!message) {
+            return res.status(400).json({ error: 'Message is required' });
+        }
+
+        // Get user info if authenticated
+        const userId = req.user?.userId;
+        const userRole = req.user?.role;
+
+        // Delegate to service
+        const response = await chatbotService.chat(
+            message,
+            conversationHistory,
+            conversationState,
+            userId,
+            userRole
+        );
+
+        return res.status(200).json({
+            success: true,
+            ...response,
+        });
+    }
+
+
+STEP 3: ChatbotService.chat() (business logic)
+
+    3a. Security Check (Prompt Injection Prevention):
+        if (this.containsPromptInjection(userMessage)) {
+            return {
+                message: "I can only answer questions about the Event Management System.",
+                suggestions: ['Show me events', 'Help']
+            };
+        }
+        
+        Blocks patterns like:
+        - "ignore previous instructions"
+        - "you are now"
+        - "forget everything"
+
+    3b. Check if in Active Booking Flow:
+        if (conversationState?.intent === 'booking' && conversationState.step) {
+            return await this.continueBookingFlow(message, state, userId);
+        }
+
+    3c. Detect User Intent:
+        private detectIntent(message: string): 'booking' | 'search' | 'cancel' | 'info' {
+            const bookingKeywords = ['book', 'buy ticket', 'purchase'];
+            const searchKeywords = ['find', 'search', 'show', 'list', 'events'];
+            
+            if (bookingKeywords.some(k => message.includes(k))) return 'booking';
+            if (searchKeywords.some(k => message.includes(k))) return 'search';
+            return 'info';
+        }
+
+    3d. Handle Intent:
+        if (intent === 'booking') {
+            return await this.handleBookingIntent(message, state, userId, userRole);
+        }
+        if (intent === 'search') {
+            return await this.handleSearchIntent(message, userId);
+        }
+        return this.getKnowledgeBasedResponse(message, userId);
+
+
+================================================================================
+PART 5: CHATBOT CAPABILITIES
+================================================================================
+
+CAPABILITY 1: SEARCH EVENTS
+
+    handleSearchIntent() queries database:
+    
+    const events = await this.eventRepository
+        .createQueryBuilder('event')
+        .where('event.isPublished = :isPublished', { isPublished: true })
+        .andWhere('event.startDateTime > :now', { now: new Date() })
+        .orderBy('event.startDateTime', 'ASC')
+        .take(5)
+        .getMany();
+    
+    Returns formatted list:
+    {
+        message: "🎉 **Upcoming Events**\n\n1. Concert - Mar 15...",
+        conversationState: { intent: 'booking', step: 'select_event', searchResults: [...] },
+        suggestions: ['Concert', 'Workshop'],
+        actions: [{ type: 'navigate', label: 'View All Events', target: '/events' }]
+    }
+
+
+CAPABILITY 2: MULTI-TURN BOOKING FLOW
+
+    Step-by-step conversation flow:
+    
+    STEP 1 - SELECT EVENT:
+        User: "Book tickets"
+        Bot: Shows list of events
+        State: { step: 'select_event', searchResults: [...] }
+    
+    STEP 2 - SELECT TICKET TYPE:
+        User: "1" or "Concert"
+        Bot: Shows ticket types for that event
+        State: { step: 'select_ticket_type', eventId: '...', eventName: 'Concert' }
+    
+    STEP 3 - SELECT QUANTITY:
+        User: "2"
+        Bot: Shows booking summary
+        State: { step: 'confirm_booking', quantity: 2 }
+    
+    STEP 4 - CONFIRM:
+        User: "Yes"
+        Bot: Creates booking in database!
+        
+        // Actual database transaction:
+        const booking = await AppDataSource.transaction(async (em) => {
+            const ticketType = await em.getRepository(TicketType)
+                .createQueryBuilder('tt')
+                .setLock('pessimistic_write')  // Lock row
+                .where('tt.id = :id', { id: state.ticketTypeId })
+                .getOne();
+            
+            // Check availability
+            const available = ticketType.capacity - ticketType.sold;
+            if (available < state.quantity) throw new Error('Not enough tickets');
+            
+            // Create booking
+            const newBooking = em.getRepository(Booking).create({
+                userId,
+                eventId: state.eventId,
+                ticketTypeId: state.ticketTypeId,
+                quantity: state.quantity,
+                totalPrice,
+                status: BookingStatus.CONFIRMED,
+            });
+            await em.getRepository(Booking).save(newBooking);
+            
+            // Update sold count
+            ticketType.sold += state.quantity;
+            await em.getRepository(TicketType).save(ticketType);
+            
+            return newBooking;
+        });
+
+
+CAPABILITY 3: KNOWLEDGE-BASED RESPONSES
+
+    For general questions, uses pattern matching:
+    
+    if (message.includes('register') || message.includes('sign up')) {
+        return {
+            message: "📝 **How to Create an Account**\n\n1. Click Sign Up...",
+            suggestions: ['Show me events'],
+            actions: [{ type: 'navigate', label: 'Create Account', target: '/register' }]
+        };
+    }
+
+
+CAPABILITY 4: LOGIN/ROLE AWARENESS
+
+    For booking (requires login):
+    
+    if (!userId) {
+        return {
+            message: "🔐 **Login Required**\n\nTo book tickets...",
+            actions: [{ type: 'navigate', label: 'Sign In', target: '/login' }]
+        };
+    }
+    
+    if (userRole !== 'attendee') {
+        return {
+            message: "⚠️ Only attendee accounts can book tickets."
+        };
+    }
+
+
+================================================================================
+PART 6: RESPONSE FORMAT
+================================================================================
+
+CHATBOT RESPONSE STRUCTURE:
+
+    {
+        success: true,
+        message: "🎉 Here are upcoming events...",
+        
+        // For multi-turn conversations (booking flow)
+        conversationState: {
+            intent: 'booking',
+            step: 'select_event',
+            eventId: null,
+            searchResults: [...]
+        },
+        
+        // Quick reply chips
+        suggestions: ['Concert', 'Workshop', 'Cancel'],
+        
+        // Navigation buttons
+        actions: [
+            { type: 'navigate', label: 'View All Events', target: '/events' },
+            { type: 'navigate', label: 'My Bookings', target: '/attendee/bookings' }
+        ],
+        
+        timestamp: "2024-01-15T10:30:00Z"
+    }
+
+
+================================================================================
+PART 7: FRONTEND RENDERING
+================================================================================
+
+MESSAGE RENDERING (Chatbot.tsx):
+
+    {messages.map((message, index) => (
+        <div className={`message ${message.role}`}>
+            <div className="message-content">
+                {formatMessage(message.content)}  {/* Bold text support */}
+            </div>
+            
+            {/* Action buttons */}
+            {message.actions?.map(action => (
+                <button onClick={() => handleAction(action)}>
+                    {action.label}
+                </button>
+            ))}
+            
+            {/* Suggestion chips */}
+            {message.suggestions?.map(suggestion => (
+                <button onClick={() => sendMessage(suggestion)}>
+                    {suggestion}
+                </button>
+            ))}
+        </div>
+    ))}
+
+
+FORMATTING (Bold Text):
+
+    const formatMessage = (text) => {
+        // Convert **text** to <strong>text</strong>
+        return text.split(/(\*\*[^*]+\*\*)/g).map(part => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                return <strong>{part.slice(2, -2)}</strong>;
+            }
+            return part;
+        });
+    };
+
+
+================================================================================
+SUMMARY: COMPLETE CHATBOT FLOW
+================================================================================
+
+USER TYPES: "Book tickets for concert"
+         ↓
+FRONTEND: sendMessage() prepares request
+         ↓
+HTTP POST: /api/chatbot/chat with message + state
+         ↓
+MIDDLEWARE: optionalAuthenticate checks token (optional)
+         ↓
+CONTROLLER: Receives message, userId, userRole
+         ↓
+SERVICE: Security check (prompt injection)
+         ↓
+SERVICE: Detect intent → 'booking'
+         ↓
+SERVICE: Check login → if not logged in, return login prompt
+         ↓
+SERVICE: Search database for events matching "concert"
+         ↓
+SERVICE: Build response with events list + suggestions + state
+         ↓
+RESPONSE: JSON with message, conversationState, suggestions, actions
+         ↓
+FRONTEND: Updates messages array + state
+         ↓
+REACT: Renders new message with formatted text + buttons
+         ↓
+USER SEES: Event list with clickable suggestions
+
+NEXT MESSAGE: User clicks "Concert" suggestion
+         ↓
+STATE: conversationState.step = 'select_event'
+         ↓
+...continues multi-turn booking flow...
+
+================================================================================

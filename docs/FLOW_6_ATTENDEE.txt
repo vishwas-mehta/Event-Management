@@ -1,0 +1,575 @@
+================================================================================
+          FULL-STACK FLOW #6: ATTENDEE FEATURES
+          End-to-End: Dashboard, Reviews, Waitlist, Profile
+================================================================================
+
+This document explains all attendee-specific features in the application.
+
+================================================================================
+PART 1: ATTENDEE DASHBOARD
+================================================================================
+
+PAGE: /attendee/dashboard (AttendeeDashboard.tsx)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Welcome back, Jane!                                                          │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  QUICK STATS                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │      5       │  │      3       │  │      2       │  │      1       │     │
+│  │ Total Books  │  │  Upcoming    │  │  Attended    │  │  On Waitlist │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  UPCOMING EVENTS                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ 🎵 Concert 2024                                                        │ │
+│  │    📅 July 15, 2024  |  🎫 VIP × 2  |  ✓ Confirmed                    │ │
+│  │                                              [View Details]             │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ 💼 Tech Workshop                                                       │ │
+│  │    📅 July 20, 2024  |  🎫 Regular × 1  |  ✓ Confirmed                │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  QUICK LINKS                                                                  │
+│  [Browse Events]  [My Bookings]  [My Reviews]  [My Profile]                  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+DATA SOURCE:
+    - Bookings come from GET /api/attendee/bookings
+    - Filtered on frontend to show upcoming/past
+
+
+================================================================================
+PART 2: REVIEWS SYSTEM
+================================================================================
+
+WHO CAN REVIEW:
+    - Only users who ATTENDED an event can write a review
+    - Must have booking with status = 'attended'
+
+
+PAGE: /events/:id (Reviews Section in EventDetailsPage)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  REVIEWS & RATINGS                           Average: ⭐⭐⭐⭐☆ (4.2)        │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ 👤 John Doe                ⭐⭐⭐⭐⭐  ✓ Verified Attendee              │ │
+│  │ Jan 16, 2024                                                           │ │
+│  │ "Amazing event! The organization was perfect and the performances..."  │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ 👤 Jane Smith              ⭐⭐⭐⭐☆  ✓ Verified Attendee              │ │
+│  │ Jan 15, 2024                                                           │ │
+│  │ "Great event overall. Venue was a bit crowded but still enjoyed it."   │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  [Load More Reviews]                                                         │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+WRITE REVIEW (Only for Past Attended Events):
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  WRITE A REVIEW                                                              │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  Your Rating: ⭐⭐⭐⭐☆ (click to rate)                                     │
+│                                                                              │
+│  Your Review:                                                                │
+│  [_______________________________________________________________________]  │
+│  [_______________________________________________________________________]  │
+│                                                                              │
+│                                                    [Submit Review]           │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+CREATE REVIEW API:
+    POST /api/attendee/events/:eventId/reviews
+    Body: {
+        rating: 4,
+        comment: "Great event! Very well organized...",
+        mediaFiles: []
+    }
+
+
+BACKEND (attendee.controller.ts - createReview):
+    createReview = asyncHandler(async (req, res) => {
+        const { eventId } = req.params;
+        const userId = req.user.userId;
+        const { rating, comment, mediaFiles } = req.body;
+        
+        // Validation
+        if (!rating || rating < 1 || rating > 5) {
+            throw new ValidationError('Rating must be between 1 and 5');
+        }
+        
+        // Check if already reviewed
+        const existingReview = await this.reviewRepository.findOne({
+            where: { userId, eventId },
+        });
+        
+        if (existingReview) {
+            throw new ConflictError('You have already reviewed this event');
+        }
+        
+        // CRITICAL: Verify user ATTENDED the event
+        const attendedBooking = await this.bookingRepository.findOne({
+            where: {
+                userId,
+                eventId,
+                status: BookingStatus.ATTENDED,  // Must have attended!
+            },
+        });
+        
+        if (!attendedBooking) {
+            throw new ForbiddenError(
+                'You can only review events you have attended. Please mark your attendance first.'
+            );
+        }
+        
+        // Create review
+        const review = this.reviewRepository.create({
+            userId,
+            eventId,
+            rating,
+            comment,
+            mediaFiles,
+            isVerifiedAttendee: true,
+        });
+        
+        await this.reviewRepository.save(review);
+        
+        return sendSuccess(res, { review }, 'Review created', 201);
+    });
+
+
+GET REVIEWS (Public API):
+    GET /api/events/:eventId/reviews?page=1&limit=10
+
+    getEventReviews = asyncHandler(async (req, res) => {
+        const { eventId } = req.params;
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 10;
+        
+        const [reviews, total] = await this.reviewRepository.findAndCount({
+            where: { eventId },
+            relations: ['user'],
+            skip: (page - 1) * limit,
+            take: limit,
+            order: { createdAt: 'DESC' },
+        });
+        
+        // Calculate average
+        const avgRating = total > 0
+            ? reviews.reduce((sum, r) => sum + r.rating, 0) / total
+            : 0;
+        
+        return sendSuccess(res, {
+            reviews,
+            pagination: { total, page, limit, totalPages: ... },
+            averageRating: avgRating,
+        });
+    });
+
+
+UPDATE/DELETE REVIEW:
+    PUT /api/attendee/reviews/:id       → updateReview
+    DELETE /api/attendee/reviews/:id    → deleteReview
+
+
+================================================================================
+PART 3: WAITLIST SYSTEM
+================================================================================
+
+WHEN IS WAITLIST USED?
+    - When all tickets are sold out
+    - User wants to be notified if cancellations happen
+
+
+JOIN WAITLIST UI (in EventDetailsPage):
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  SELECT TICKETS                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ ⭐ VIP                                          $99.99                 │ │
+│  │    VIP access with premium benefits                                    │ │
+│  │    ❌ SOLD OUT                                                         │ │
+│  │                                    [Join Waitlist]                      │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+After joining:
+┌────────────────────────────────────────────────────────────────────────────┐
+│  ⭐ VIP                                          $99.99                   │
+│     VIP access with premium benefits                                       │
+│     ✓ You're #3 on the waitlist                                           │
+│                                    [Leave Waitlist]                        │
+└────────────────────────────────────────────────────────────────────────────┘
+
+
+JOIN WAITLIST API:
+    POST /api/attendee/events/:eventId/waitlist
+    Body: { ticketTypeId: "uuid" }
+
+
+BACKEND (attendee.controller.ts - joinWaitlist):
+    joinWaitlist = asyncHandler(async (req, res) => {
+        const { eventId } = req.params;
+        const userId = req.user.userId;
+        const { ticketTypeId } = req.body;
+        
+        // Check if event exists
+        const event = await this.eventRepository.findOne({
+            where: { id: eventId },
+        });
+        if (!event) throw new NotFoundError('Event not found');
+        
+        // Check if already on waitlist
+        const existingWaitlist = await this.waitlistRepository.findOne({
+            where: { userId, eventId, ticketTypeId },
+        });
+        if (existingWaitlist) {
+            throw new ConflictError('You are already on the waitlist');
+        }
+        
+        // Get position (last position + 1)
+        const lastPosition = await this.waitlistRepository
+            .createQueryBuilder('waitlist')
+            .where('waitlist.eventId = :eventId', { eventId })
+            .andWhere('waitlist.ticketTypeId = :ticketTypeId', { ticketTypeId })
+            .orderBy('waitlist.position', 'DESC')
+            .getOne();
+        
+        const position = lastPosition ? lastPosition.position + 1 : 1;
+        
+        // Create waitlist entry
+        const waitlist = this.waitlistRepository.create({
+            userId,
+            eventId,
+            ticketTypeId,
+            position,
+            status: WaitlistStatus.WAITING,
+        });
+        
+        await this.waitlistRepository.save(waitlist);
+        
+        return sendSuccess(res, {
+            message: 'Successfully joined waitlist',
+            position
+        }, 'Joined waitlist', 201);
+    });
+
+
+LEAVE WAITLIST:
+    DELETE /api/attendee/events/:eventId/waitlist
+
+    leaveWaitlist = asyncHandler(async (req, res) => {
+        const { eventId } = req.params;
+        const userId = req.user.userId;
+        
+        const waitlist = await this.waitlistRepository.findOne({
+            where: { userId, eventId },
+        });
+        
+        if (!waitlist) throw new NotFoundError('Waitlist entry not found');
+        
+        await this.waitlistRepository.remove(waitlist);
+        
+        return sendSuccess(res, { message: 'Successfully left waitlist' });
+    });
+
+
+GET MY WAITLISTS:
+    GET /api/attendee/waitlist
+
+    getMyWaitlists = asyncHandler(async (req, res) => {
+        const userId = req.user.userId;
+        
+        const waitlists = await this.waitlistRepository.find({
+            where: { userId },
+            relations: ['event', 'ticketType'],
+            order: { createdAt: 'DESC' },
+        });
+        
+        return sendSuccess(res, { waitlists });
+    });
+
+
+WAITLIST NOTIFICATION (When Booking Cancelled):
+    In cancelBooking(), after restoring ticket capacity:
+    
+    // Check waitlist for notifications
+    const waitlistUsers = await em.getRepository(Waitlist).find({
+        where: {
+            eventId: booking.eventId,
+            ticketTypeId: booking.ticketTypeId,
+            status: WaitlistStatus.WAITING,
+        },
+        order: { position: 'ASC' },
+        take: booking.quantity,  // Only notify as many as tickets freed
+    });
+    
+    // In production: Send email/notification to these users
+
+
+================================================================================
+PART 4: USER PROFILE
+================================================================================
+
+PAGE: /profile (ProfilePage.tsx)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  My Profile                                                                   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │ First Name:   [John________________]                                    ││
+│  │ Last Name:    [Doe_________________]                                    ││
+│  │ Email:        john@email.com (cannot change)                            ││
+│  │ Phone:        [+1 234-567-8900_____]                                    ││
+│  │ Profile Image URL: [https://..._____]                                   ││
+│  │                                                                          ││
+│  │                                           [Save Changes]                 ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+├──────────────────────────────────────────────────────────────────────────────┤
+│  CHANGE PASSWORD                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────┐│
+│  │ Current Password: [______________]                                      ││
+│  │ New Password:     [______________]                                      ││
+│  │ Confirm Password: [______________]                                      ││
+│  │                                           [Update Password]              ││
+│  └─────────────────────────────────────────────────────────────────────────┘│
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+UPDATE PROFILE API:
+    PUT /api/auth/profile
+    Body: {
+        firstName: "John",
+        lastName: "Doe",
+        phoneNumber: "+1 234-567-8900",
+        profileImage: "https://..."
+    }
+
+
+GET CURRENT USER:
+    GET /api/auth/me
+    
+    Returns user data for profile display
+
+
+================================================================================
+PART 5: REPORT EVENT
+================================================================================
+
+Any attendee can report an inappropriate event:
+
+VISUAL (Report Button in Event Details):
+    [Report Event 🚩]
+
+REPORT MODAL:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Report Event                                                                 │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  Why are you reporting this event?                                           │
+│                                                                              │
+│  [_______________________________________________________________________]  │
+│  [_______________________________________________________________________]  │
+│  [_______________________________________________________________________]  │
+│                                                                              │
+│                                    [Cancel]  [Submit Report]                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+API CALL:
+    POST /api/events/:id/report
+    Body: { reason: "This event contains inappropriate content..." }
+
+
+BACKEND (event.controller.ts - reportEvent):
+    reportEvent = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const { reason } = req.body;
+        const userId = req.user.userId;
+        
+        if (!reason) {
+            throw new ValidationError('Reason is required');
+        }
+        
+        const event = await this.eventRepository.findOne({
+            where: { id },
+        });
+        
+        if (!event) throw new NotFoundError('Event not found');
+        
+        // Create report
+        const report = this.reportRepository.create({
+            eventId: id,
+            reportedById: userId,
+            reason,
+        });
+        
+        await this.reportRepository.save(report);
+        
+        // Mark event as reported (for admin visibility)
+        event.isReported = true;
+        event.reportReason = reason;
+        await this.eventRepository.save(event);
+        
+        return sendSuccess(res, { message: 'Event reported successfully' });
+    });
+
+
+WHAT HAPPENS AFTER:
+    - Report appears in admin dashboard
+    - Admin can resolve (dismiss) or delete event
+    - See FLOW_4_ADMIN.txt for admin handling
+
+
+================================================================================
+PART 6: ALL ATTENDEE API ROUTES
+================================================================================
+
+FILE: /backend/src/routes/attendee.routes.ts
+
+    // All routes require attendee authentication
+    router.use(authenticate, authorize([UserRole.ATTENDEE]));
+    
+    // Bookings
+    POST   /attendee/bookings                  → bookTicket
+    GET    /attendee/bookings                  → getMyBookings
+    GET    /attendee/bookings/:id              → getBookingById
+    DELETE /attendee/bookings/:id              → cancelBooking
+    POST   /attendee/bookings/:id/attend       → markAttendance
+    
+    // Reviews
+    POST   /attendee/events/:eventId/reviews   → createReview
+    PUT    /attendee/reviews/:id               → updateReview
+    DELETE /attendee/reviews/:id               → deleteReview
+    
+    // Waitlist
+    POST   /attendee/events/:eventId/waitlist  → joinWaitlist
+    DELETE /attendee/events/:eventId/waitlist  → leaveWaitlist
+    GET    /attendee/waitlist                  → getMyWaitlists
+
+
+PUBLIC ATTENDEE-RELATED ROUTES (no auth required):
+    GET /events/:eventId/reviews              → getEventReviews
+
+
+================================================================================
+PART 7: DATABASE ENTITIES
+================================================================================
+
+REVIEW ENTITY:
+    @Entity('reviews')
+    export class Review {
+        @PrimaryGeneratedColumn('uuid')
+        id: string;
+        
+        @Column()
+        userId: string;
+        
+        @Column()
+        eventId: string;
+        
+        @Column()
+        rating: number;  // 1-5
+        
+        @Column({ nullable: true })
+        comment: string;
+        
+        @Column('simple-array', { nullable: true })
+        mediaFiles: string[];
+        
+        @Column({ default: false })
+        isVerifiedAttendee: boolean;
+        
+        @CreateDateColumn()
+        createdAt: Date;
+        
+        @ManyToOne(() => User)
+        user: User;
+        
+        @ManyToOne(() => Event)
+        event: Event;
+    }
+
+
+WAITLIST ENTITY:
+    @Entity('waitlists')
+    export class Waitlist {
+        @PrimaryGeneratedColumn('uuid')
+        id: string;
+        
+        @Column()
+        userId: string;
+        
+        @Column()
+        eventId: string;
+        
+        @Column({ nullable: true })
+        ticketTypeId: string;
+        
+        @Column()
+        position: number;  // Queue position
+        
+        @Column({
+            type: 'enum',
+            enum: WaitlistStatus,
+            default: WaitlistStatus.WAITING,
+        })
+        status: WaitlistStatus;
+        
+        @CreateDateColumn()
+        createdAt: Date;
+        
+        @ManyToOne(() => User)
+        user: User;
+        
+        @ManyToOne(() => Event)
+        event: Event;
+        
+        @ManyToOne(() => TicketType)
+        ticketType: TicketType;
+    }
+    
+    enum WaitlistStatus {
+        WAITING = 'waiting',
+        NOTIFIED = 'notified',
+        EXPIRED = 'expired',
+    }
+
+
+================================================================================
+SUMMARY: ATTENDEE FEATURES
+================================================================================
+
+BROWSE & BOOK:
+    Browse Events → Select Event → Book Tickets → Payment → Confirmation
+    (See FLOW_5_BOOKINGS.txt for details)
+
+VIEW BOOKINGS:
+    Dashboard → My Bookings → See upcoming/past events
+
+MARK ATTENDANCE:
+    My Bookings → (after event starts) → Mark Attendance
+
+WRITE REVIEW:
+    My Bookings → Past Events → (if attended) → Write Review
+    OR: Event Details Page → Reviews Section → Write Review
+
+WAITLIST:
+    Event Details → (sold out ticket) → Join Waitlist
+    When someone cancels → You get notified → Book ticket
+
+REPORT EVENT:
+    Event Details → Report Flag → Submit Report → Admin reviews
+
+PROFILE:
+    Profile Page → Update personal info → Save Changes
+
+================================================================================

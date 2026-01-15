@@ -1,0 +1,314 @@
+================================================================================
+          DATABASE UNDERSTANDING - TABLES, RELATIONS & DATA FLOW
+================================================================================
+
+8 Tables | PostgreSQL | TypeORM
+
+================================================================================
+TABLE OVERVIEW
+================================================================================
+
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│     USERS       │     │   CATEGORIES    │     │     EVENTS      │
+│─────────────────│     │─────────────────│     │─────────────────│
+│ id (PK)         │     │ id (PK)         │     │ id (PK)         │
+│ email           │     │ name            │     │ organizer_id(FK)│──→ users
+│ password        │     │ slug            │     │ category_id(FK) │──→ categories
+│ firstName       │     │ description     │     │ title           │
+│ lastName        │     └─────────────────┘     │ description     │
+│ role (enum)     │                             │ startDateTime   │
+│ status (enum)   │                             │ location        │
+└─────────────────┘                             │ capacity        │
+        │                                       └─────────────────┘
+        │                                               │
+        │ OneToMany                                     │ OneToMany
+        ▼                                               ▼
+┌─────────────────┐                             ┌─────────────────┐
+│    BOOKINGS     │                             │  TICKET_TYPES   │
+│─────────────────│                             │─────────────────│
+│ id (PK)         │                             │ id (PK)         │
+│ user_id (FK) ───│──→ users                    │ event_id (FK)───│──→ events
+│ event_id (FK)───│──→ events                   │ name            │
+│ ticket_type_id──│──→ ticket_types             │ price           │
+│ quantity        │                             │ capacity        │
+│ totalPrice      │                             │ sold            │
+│ status          │                             │ dynamicPricing  │
+│ bookingReference│                             └─────────────────┘
+└─────────────────┘
+
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│    REVIEWS      │     │    WAITLISTS    │     │ REPORTED_EVENTS │
+│─────────────────│     │─────────────────│     │─────────────────│
+│ id (PK)         │     │ id (PK)         │     │ id (PK)         │
+│ user_id (FK)────│     │ user_id (FK)────│     │ event_id (FK)───│
+│ event_id (FK)───│     │ event_id (FK)───│     │ reportedBy(FK)──│
+│ rating (1-5)    │     │ ticket_type_id  │     │ reason          │
+│ comment         │     │ position        │     │ status          │
+└─────────────────┘     │ status          │     └─────────────────┘
+                        └─────────────────┘
+
+
+================================================================================
+RELATIONSHIP SUMMARY
+================================================================================
+
+USER can be:
+    → ADMIN (manages platform)
+    → ORGANIZER (creates events) → has many EVENTS
+    → ATTENDEE (books tickets) → has many BOOKINGS, REVIEWS, WAITLISTS
+
+EVENT belongs to:
+    → One ORGANIZER (user)
+    → One CATEGORY
+EVENT has many:
+    → TICKET_TYPES (Regular, VIP, etc.)
+    → BOOKINGS
+    → REVIEWS
+    → WAITLISTS
+
+BOOKING connects:
+    → One USER (who booked)
+    → One EVENT (what event)
+    → One TICKET_TYPE (which ticket)
+
+
+================================================================================
+EXAMPLE: COMPLETE DATA FLOW
+================================================================================
+
+STEP 1: Admin seeds categories
+────────────────────────────────────────────────────────────────────────────────
+INSERT INTO categories:
+    { id: "cat-1", name: "Music", slug: "music" }
+    { id: "cat-2", name: "Technology", slug: "technology" }
+
+
+STEP 2: User registers as organizer
+────────────────────────────────────────────────────────────────────────────────
+INSERT INTO users:
+    {
+        id: "user-org-1",
+        email: "john@email.com",
+        password: "$2b$10$...",     ← bcrypt hashed
+        firstName: "John",
+        lastName: "Smith",
+        role: "organizer",
+        status: "pending"           ← needs admin approval
+    }
+
+Admin approves:
+UPDATE users SET status = 'active' WHERE id = 'user-org-1';
+
+
+STEP 3: Organizer creates event
+────────────────────────────────────────────────────────────────────────────────
+INSERT INTO events:
+    {
+        id: "event-1",
+        organizer_id: "user-org-1",     ← FK to users
+        category_id: "cat-1",           ← FK to categories
+        title: "Summer Concert",
+        description: "Amazing concert...",
+        start_date_time: "2024-07-15 18:00:00",
+        location: "Central Park",
+        capacity: 550,
+        is_published: true
+    }
+
+
+STEP 4: Ticket types created (in same transaction)
+────────────────────────────────────────────────────────────────────────────────
+INSERT INTO ticket_types:
+    {
+        id: "ticket-1",
+        event_id: "event-1",            ← FK to events
+        name: "Regular",
+        price: 0,
+        capacity: 500,
+        sold: 0,
+        dynamic_pricing: NULL
+    },
+    {
+        id: "ticket-2",
+        event_id: "event-1",            ← FK to events
+        name: "VIP",
+        price: 49.99,                   ← early bird price
+        capacity: 50,
+        sold: 0,
+        dynamic_pricing: {
+            "type": "early_bird",
+            "originalPrice": 99.99,
+            "earlyBirdQuantity": 20,
+            "earlyBirdPrice": 49.99
+        }
+    }
+
+
+STEP 5: Attendee registers
+────────────────────────────────────────────────────────────────────────────────
+INSERT INTO users:
+    {
+        id: "user-att-1",
+        email: "jane@email.com",
+        password: "$2b$10$...",
+        firstName: "Jane",
+        lastName: "Doe",
+        role: "attendee",
+        status: "active"                ← attendees are active immediately
+    }
+
+
+STEP 6: Attendee books tickets
+────────────────────────────────────────────────────────────────────────────────
+INSERT INTO bookings:
+    {
+        id: "booking-1",
+        user_id: "user-att-1",          ← FK to users
+        event_id: "event-1",            ← FK to events
+        ticket_type_id: "ticket-2",     ← FK to ticket_types (VIP)
+        quantity: 2,
+        total_price: 99.98,             ← 2 × $49.99 (early bird)
+        status: "confirmed",
+        booking_reference: "EVT-20240110-4521",
+        payment_status: "completed"
+    }
+
+UPDATE ticket_types SET sold = sold + 2 WHERE id = 'ticket-2';
+    → sold: 0 → 2
+
+
+STEP 7: Attendee attends event
+────────────────────────────────────────────────────────────────────────────────
+UPDATE bookings SET status = 'attended', attended_at = NOW() 
+WHERE id = 'booking-1';
+
+
+STEP 8: Attendee writes review (only after attending)
+────────────────────────────────────────────────────────────────────────────────
+INSERT INTO reviews:
+    {
+        id: "review-1",
+        user_id: "user-att-1",          ← FK to users
+        event_id: "event-1",            ← FK to events
+        rating: 5,
+        comment: "Amazing event!",
+        is_verified_attendee: true
+    }
+
+
+STEP 9: Someone reports the event
+────────────────────────────────────────────────────────────────────────────────
+INSERT INTO reported_events:
+    {
+        id: "report-1",
+        event_id: "event-1",            ← FK to events
+        reported_by: "user-att-2",      ← FK to users (different user)
+        reason: "Inappropriate content",
+        status: "pending"
+    }
+
+UPDATE events SET is_reported = true WHERE id = 'event-1';
+
+
+STEP 10: Tickets sold out → User joins waitlist
+────────────────────────────────────────────────────────────────────────────────
+INSERT INTO waitlists:
+    {
+        id: "wait-1",
+        user_id: "user-att-3",          ← FK to users
+        event_id: "event-1",            ← FK to events
+        ticket_type_id: "ticket-2",     ← FK to ticket_types
+        position: 1,                    ← first in queue
+        status: "waiting"
+    }
+
+
+================================================================================
+FK CASCADE BEHAVIOR
+================================================================================
+
+When ORGANIZER is deleted:
+    → All their EVENTS are deleted (CASCADE)
+    → All BOOKINGS for those events → CASCADE
+    → All TICKET_TYPES for those events → CASCADE
+    → All REVIEWS for those events → CASCADE
+
+Code: @ManyToOne(() => User, { onDelete: 'CASCADE' })
+
+
+================================================================================
+ENUMS (Predefined Values)
+================================================================================
+
+UserRole:        'admin' | 'organizer' | 'attendee'
+UserStatus:      'active' | 'pending' | 'blocked'
+BookingStatus:   'confirmed' | 'cancelled' | 'attended'
+PaymentStatus:   'pending' | 'completed' | 'failed' | 'refunded'
+WaitlistStatus:  'waiting' | 'notified' | 'expired'
+ReportStatus:    'pending' | 'resolved' | 'dismissed'
+
+
+================================================================================
+AUTO-GENERATED FIELDS
+================================================================================
+
+id:               UUID v4 auto-generated
+created_at:       Timestamp auto-set on insert
+updated_at:       Timestamp auto-updated on change
+bookingReference: Auto-generated "EVT-YYYYMMDD-XXXX" before insert
+
+Code:
+    @BeforeInsert()
+    generateBookingReference() {
+        const dateStr = new Date().toISOString().slice(0,10).replace(/-/g,'');
+        const random = Math.floor(1000 + Math.random() * 9000);
+        this.bookingReference = `EVT-${dateStr}-${random}`;
+    }
+
+
+================================================================================
+QUERY EXAMPLES (TypeORM)
+================================================================================
+
+Get event with all relations:
+    eventRepository.findOne({
+        where: { id: eventId },
+        relations: ['organizer', 'category', 'ticketTypes', 'bookings', 'reviews']
+    });
+
+Get user's bookings:
+    bookingRepository.find({
+        where: { userId: userId },
+        relations: ['event', 'ticketType']
+    });
+
+Count bookings for organizer's events:
+    bookingRepository.count({
+        where: { event: { organizerId: organizerId } }
+    });
+
+
+================================================================================
+SUMMARY
+================================================================================
+
+8 TABLES:
+    users          → All users (admin, organizer, attendee)
+    categories     → Event categories (seeded)
+    events         → Events created by organizers
+    ticket_types   → Ticket tiers per event
+    bookings       → Attendee purchases
+    reviews        → Post-event reviews
+    waitlists      → Sold-out queue
+    reported_events → Flagged events
+
+KEY RELATIONSHIPS:
+    User(organizer) ─1:N→ Events ─1:N→ TicketTypes
+    User(attendee) ─1:N→ Bookings ─N:1→ Event
+
+DATA INTEGRITY:
+    FKs ensure referential integrity
+    Transactions ensure atomic operations
+    Row locking prevents race conditions
+
+================================================================================

@@ -1,0 +1,367 @@
+================================================================================
+          FULL-STACK FLOW #1: SEARCH & BROWSE EVENTS
+          End-to-End: Frontend → Backend → Database → Response
+================================================================================
+
+This document explains the complete flow when a user searches/browses events.
+
+================================================================================
+PART 1: WHAT THE USER SEES (FRONTEND UI)
+================================================================================
+
+PAGE: /events (EventsPage.tsx)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  NAVBAR                                                                       │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  FILTERS (Sidebar)         │  EVENT CARDS (Grid)                             │
+│  ┌───────────────────────┐ │  ┌───────────────┐ ┌───────────────┐            │
+│  │ 🔍 Search              │ │  │ Event 1       │ │ Event 2       │            │
+│  │ [______________]       │ │  │ [Image]       │ │ [Image]       │            │
+│  │                        │ │  │ Title         │ │ Title         │            │
+│  │ Category               │ │  │ Date • Price  │ │ Date • Price  │            │
+│  │ [All Categories  ▼]    │ │  └───────────────┘ └───────────────┘            │
+│  │                        │ │                                                 │
+│  │ Location               │ │  ┌───────────────┐ ┌───────────────┐            │
+│  │ [______________]       │ │  │ Event 3       │ │ Event 4       │            │
+│  │                        │ │  │ ...           │ │ ...           │            │
+│  │ ☐ Free events only     │ │  └───────────────┘ └───────────────┘            │
+│  │ ☐ Has availability     │ │                                                 │
+│  │                        │ │  [Pagination: 1 2 3 ... 5]                      │
+│  │ [Clear Filters]        │ │                                                 │
+│  └───────────────────────┘ │                                                  │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  FOOTER                                                                       │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+PART 2: FRONTEND COMPONENTS INVOLVED
+================================================================================
+
+COMPONENT HIERARCHY:
+    App.tsx
+    └── MainLayout
+        ├── Navbar
+        ├── EventsPage (main component)
+        │   ├── FilterSidebar (inline in EventsPage)
+        │   ├── EventCard (for each event)
+        │   └── Pagination
+        └── Footer
+
+
+KEY FILES:
+    /frontend/src/pages/Events/EventsPage.tsx   ← Main page component
+    /frontend/src/components/Events/EventCard.tsx  ← Event card display
+    /frontend/src/api/events.api.ts             ← API functions
+    /frontend/src/api/axios.ts                  ← HTTP client config
+
+
+================================================================================
+PART 3: FRONTEND CODE FLOW
+================================================================================
+
+STEP 1: Page Loads
+    User navigates to /events
+    React Router renders EventsPage component
+
+STEP 2: State Initialization (EventsPage.tsx)
+    const [events, setEvents] = useState([]);      // Holds event data
+    const [categories, setCategories] = useState([]);
+    const [filters, setFilters] = useState({
+        page: 1, limit: 12, sortBy: 'date', order: 'ASC'
+    });
+    const [loading, setLoading] = useState(true);
+
+STEP 3: Initial Data Fetch (useEffect hooks)
+    useEffect(() => { loadCategories(); }, []);   // Once on mount
+    useEffect(() => { loadEvents(); }, [filters]); // When filters change
+
+STEP 4: API Call (loadEvents function)
+    const loadEvents = async () => {
+        setLoading(true);
+        const response = await eventsApi.getEvents(filters);
+        setEvents(response.data.events);
+        setPagination(response.data.pagination);
+        setLoading(false);
+    };
+
+STEP 5: eventsApi.getEvents() (events.api.ts)
+    getEvents: async (filters) => {
+        const params = new URLSearchParams();
+        Object.entries(filters).forEach(([key, value]) => {
+            if (value) params.append(key, value.toString());
+        });
+        const response = await api.get(`/events?${params.toString()}`);
+        return response.data;
+    }
+    
+    Converts filters to query string:
+    { page: 1, category: 'music', search: 'concert' }
+    → /events?page=1&category=music&search=concert
+
+STEP 6: axios.ts Sends Request
+    - Adds Content-Type: application/json
+    - Adds Authorization: Bearer <token> (if logged in)
+    - Sends GET request to backend
+
+
+================================================================================
+PART 4: BACKEND FLOW
+================================================================================
+
+REQUEST JOURNEY:
+    HTTP GET /api/events?page=1&category=music&search=concert
+         ↓
+    server.ts (Express server listening on port 5000)
+         ↓
+    app.ts (Express app with middleware)
+         ↓
+    /api/events route → event.routes.ts
+         ↓
+    eventController.getEvents
+
+
+FILES INVOLVED:
+    /backend/src/server.ts          ← Starts server
+    /backend/src/app.ts             ← Configures Express app
+    /backend/src/routes/event.routes.ts    ← Route definitions
+    /backend/src/controllers/event.controller.ts ← Business logic
+    /backend/src/entities/Event.entity.ts  ← Database model
+
+
+STEP 1: server.ts Starts
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT);
+
+STEP 2: app.ts Configures Express
+    app.use(express.json());           // Parse JSON bodies
+    app.use(cors());                   // Allow cross-origin requests
+    app.use('/api/events', eventRoutes);  // Mount event routes
+
+STEP 3: event.routes.ts Defines Routes
+    router.get('/', eventController.getEvents);  // GET /api/events
+
+STEP 4: EventController.getEvents() Processes Request
+
+    4a. Extract filters from query string:
+        const filters = {
+            search: req.query.search,
+            category: req.query.category,
+            page: parseInt(req.query.page) || 1,
+            limit: parseInt(req.query.limit) || 10,
+            ...
+        };
+
+    4b. Build TypeORM query:
+        const query = this.eventRepository
+            .createQueryBuilder('event')
+            .leftJoinAndSelect('event.category', 'category')
+            .leftJoinAndSelect('event.organizer', 'organizer')
+            .leftJoinAndSelect('event.ticketTypes', 'ticketTypes')
+            .where('event.isPublished = :isPublished', { isPublished: true });
+
+    4c. Apply search filter (if provided):
+        if (search) {
+            query.andWhere(
+                '(event.title ILIKE :search OR event.description ILIKE :search)',
+                { search: `%${search}%` }
+            );
+        }
+        
+        ILIKE = case-insensitive pattern matching in PostgreSQL
+        %search% = matches anywhere in the text
+
+    4d. Apply category filter:
+        if (category) {
+            query.andWhere('category.slug = :category', { category });
+        }
+
+    4e. Apply other filters (location, dates, price, availability):
+        if (isFree) query.andWhere('ticketTypes.price = 0');
+        if (hasAvailability) query.andWhere('ticketTypes.sold < ticketTypes.capacity');
+
+    4f. Apply pagination:
+        const skip = (page - 1) * limit;
+        query.skip(skip).take(limit);
+        
+        page=2, limit=10 → skip=10, take=10 → shows items 11-20
+
+    4g. Check cache (Redis):
+        const cached = await cacheService.get(cacheKey);
+        if (cached) return sendSuccess(res, cached);
+
+    4h. Execute query:
+        const [events, total] = await query.getManyAndCount();
+        // events = array of event objects
+        // total = total count (for pagination)
+
+    4i. Cache result:
+        await cacheService.set(cacheKey, result, 60);  // 60 seconds
+
+    4j. Send response:
+        return sendSuccess(res, result, 'Events retrieved successfully');
+
+
+================================================================================
+PART 5: DATABASE QUERY (What SQL Actually Runs)
+================================================================================
+
+The TypeORM query translates to SQL like:
+
+    SELECT 
+        event.*,
+        category.*,
+        organizer.*,
+        ticketTypes.*
+    FROM events event
+    LEFT JOIN categories category ON event.categoryId = category.id
+    LEFT JOIN users organizer ON event.organizerId = organizer.id
+    LEFT JOIN ticket_types ticketTypes ON ticketTypes.eventId = event.id
+    WHERE event.isPublished = true
+      AND (event.title ILIKE '%concert%' OR event.description ILIKE '%concert%')
+      AND category.slug = 'music'
+    ORDER BY event.startDateTime ASC
+    LIMIT 12 OFFSET 0;
+
+
+DATABASE TABLES INVOLVED:
+    events          ← Main event data
+    categories      ← Event categories (music, tech, etc.)
+    users           ← Organizer info (joined via organizerId)
+    ticket_types    ← Ticket info (price, capacity, sold)
+
+
+================================================================================
+PART 6: RESPONSE FLOW (Backend → Frontend)
+================================================================================
+
+BACKEND SENDS:
+    {
+        success: true,
+        message: "Events retrieved successfully",
+        data: {
+            events: [
+                {
+                    id: "uuid-1",
+                    title: "Summer Concert",
+                    description: "...",
+                    startDateTime: "2024-07-15T18:00:00Z",
+                    location: "Central Park",
+                    bannerImage: "https://...",
+                    category: { id: "cat-1", name: "Music", slug: "music" },
+                    organizer: { id: "...", firstName: "John" },
+                    ticketTypes: [
+                        { id: "t1", name: "General", price: 0, capacity: 500, sold: 150 },
+                        { id: "t2", name: "VIP", price: 99, capacity: 50, sold: 10 }
+                    ]
+                },
+                // ... more events
+            ],
+            pagination: {
+                total: 45,
+                page: 1,
+                limit: 12,
+                totalPages: 4
+            }
+        }
+    }
+
+
+FRONTEND RECEIVES & UPDATES:
+    setEvents(response.data.events);      // Update state
+    setPagination(response.data.pagination);
+    setLoading(false);
+    
+    → React re-renders with new data
+
+
+================================================================================
+PART 7: UI RENDERING (EventCard Component)
+================================================================================
+
+For each event in the array, EventCard renders:
+
+    const EventCard = ({ event }) => {
+        return (
+            <Link to={`/events/${event.id}`}>
+                <Card>
+                    <img src={event.bannerImage} />
+                    <Badge>{event.category.name}</Badge>
+                    <h5>{event.title}</h5>
+                    <span>{formatEventDateTime(event.startDateTime)}</span>
+                    <span>{event.location}</span>
+                    <span>{getPriceRange(event.ticketTypes)}</span>
+                </Card>
+            </Link>
+        );
+    };
+
+    getPriceRange() calculates:
+    - Finds min and max prices from ticketTypes
+    - Returns "Free" if min is 0
+    - Returns "$10 - $99" for range
+    - Returns "$50" if min equals max
+
+
+================================================================================
+PART 8: USER INTERACTION (Filter Change)
+================================================================================
+
+When user types in search box or selects category:
+
+    1. onChange handler fires:
+        onChange={(e) => handleFilterChange('search', e.target.value)}
+
+    2. handleFilterChange updates state:
+        const handleFilterChange = (key, value) => {
+            setFilters({ ...filters, [key]: value, page: 1 });
+        };
+        // page: 1 resets to first page on filter change
+
+    3. useEffect detects filter change:
+        useEffect(() => { loadEvents(); }, [filters]);
+
+    4. loadEvents() makes new API call with updated filters
+
+    5. UI updates with new results
+
+
+================================================================================
+SUMMARY: COMPLETE FLOW
+================================================================================
+
+USER ACTION: Opens /events or changes filter
+         ↓
+FRONTEND: EventsPage component
+         ↓
+STATE: filters object updated
+         ↓
+useEffect triggers loadEvents()
+         ↓
+API LAYER: eventsApi.getEvents(filters)
+         ↓
+AXIOS: GET /api/events?...
+         ↓
+BACKEND: Express receives request
+         ↓
+ROUTER: event.routes.ts → getEvents
+         ↓
+CONTROLLER: Builds TypeORM query with filters
+         ↓
+CACHE: Check Redis for cached result
+         ↓
+DATABASE: PostgreSQL executes SQL query
+         ↓
+CONTROLLER: Formats response, caches result
+         ↓
+RESPONSE: JSON sent back
+         ↓
+FRONTEND: Updates state with setEvents()
+         ↓
+REACT: Re-renders EventCards with new data
+         ↓
+USER SEES: Updated list of events
+
+================================================================================

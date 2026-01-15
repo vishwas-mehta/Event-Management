@@ -1,0 +1,1034 @@
+================================================================================
+          BACKEND DEEP DIVE - EVENTHUB EVENT MANAGEMENT SYSTEM
+          A Complete Guide to Understanding the Backend Architecture
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. DATABASE & TABLES
+2. ENTRY POINT - HOW THE APPLICATION STARTS
+3. HOW SERVER, REDIS & DATABASE CONNECT
+4. FOLDER STRUCTURE EXPLAINED
+5. ROUTE DEFINITION - 3 COMPLETE EXAMPLES
+6. COMPLETE REQUEST FLOW WALKTHROUGH
+7. UTILITY FILES EXPLAINED
+8. KEY CONCEPTS SUMMARY
+
+================================================================================
+                        PART 1: DATABASE & TABLES
+================================================================================
+
+DATABASE: PostgreSQL
+ORM: TypeORM (Object-Relational Mapping)
+
+What is an ORM?
+---------------
+Instead of writing raw SQL queries, you define TypeScript classes (called Entities)
+that map directly to database tables. TypeORM converts your TypeScript code into
+SQL queries automatically.
+
+TABLES IN THE DATABASE (8 Total)
+--------------------------------
+
+1. USERS TABLE (users)
+   +------------------+------------------+--------------------------------------+
+   | Column Name      | Data Type        | Description                          |
+   +------------------+------------------+--------------------------------------+
+   | id               | UUID (Primary)   | Unique identifier for each user      |
+   | email            | VARCHAR (Unique) | User's email address                 |
+   | password         | VARCHAR          | Hashed password (never store plain!) |
+   | first_name       | VARCHAR          | User's first name                    |
+   | last_name        | VARCHAR          | User's last name                     |
+   | role             | ENUM             | 'admin', 'organizer', 'attendee'     |
+   | status           | ENUM             | 'active', 'pending', 'blocked'       |
+   | phone_number     | VARCHAR          | Optional phone number                |
+   | profile_image    | VARCHAR          | Optional profile picture URL         |
+   | created_at       | TIMESTAMP        | When user registered                 |
+   | updated_at       | TIMESTAMP        | When profile was last updated        |
+   +------------------+------------------+--------------------------------------+
+
+   RELATIONSHIPS:
+   - One User can have MANY Events (if organizer)
+   - One User can have MANY Bookings
+   - One User can have MANY Reviews
+   - One User can have MANY Waitlist entries
+
+2. EVENTS TABLE (events)
+   +------------------+------------------+--------------------------------------+
+   | Column Name      | Data Type        | Description                          |
+   +------------------+------------------+--------------------------------------+
+   | id               | UUID (Primary)   | Unique event identifier              |
+   | organizer_id     | UUID (FK)        | References users.id                  |
+   | category_id      | UUID (FK)        | References categories.id             |
+   | title            | VARCHAR          | Event title                          |
+   | description      | TEXT             | Full event description               |
+   | start_date_time  | TIMESTAMP        | When event starts                    |
+   | end_date_time    | TIMESTAMP        | When event ends                      |
+   | banner_image     | VARCHAR          | Event poster/banner URL              |
+   | teaser_video     | VARCHAR          | YouTube or video URL                 |
+   | location         | VARCHAR          | City/venue name                      |
+   | address          | VARCHAR          | Full address                         |
+   | latitude         | DECIMAL          | GPS coordinate                       |
+   | longitude        | DECIMAL          | GPS coordinate                       |
+   | capacity         | INT              | Maximum attendees                    |
+   | is_published     | BOOLEAN          | Is event visible to public?          |
+   | is_reported      | BOOLEAN          | Has event been reported?             |
+   | report_reason    | TEXT             | Why was it reported?                 |
+   | created_at       | TIMESTAMP        | When event was created               |
+   | updated_at       | TIMESTAMP        | When event was last modified         |
+   +------------------+------------------+--------------------------------------+
+
+   RELATIONSHIPS:
+   - One Event belongs to ONE User (organizer)
+   - One Event belongs to ONE Category
+   - One Event can have MANY TicketTypes
+   - One Event can have MANY Bookings
+   - One Event can have MANY Reviews
+
+3. CATEGORIES TABLE (categories)
+   +------------------+------------------+--------------------------------------+
+   | Column Name      | Data Type        | Description                          |
+   +------------------+------------------+--------------------------------------+
+   | id               | UUID (Primary)   | Unique category identifier           |
+   | name             | VARCHAR (Unique) | Category name (e.g., "Music")        |
+   | slug             | VARCHAR (Unique) | URL-friendly name (e.g., "music")    |
+   | description      | TEXT             | Category description                 |
+   | icon             | VARCHAR          | Icon name or URL                     |
+   | created_at       | TIMESTAMP        | When category was created            |
+   +------------------+------------------+--------------------------------------+
+
+4. TICKET_TYPES TABLE (ticket_types)
+   +------------------+------------------+--------------------------------------+
+   | Column Name      | Data Type        | Description                          |
+   +------------------+------------------+--------------------------------------+
+   | id               | UUID (Primary)   | Unique ticket type identifier        |
+   | event_id         | UUID (FK)        | References events.id                 |
+   | name             | VARCHAR          | Ticket name (e.g., "VIP", "General") |
+   | description      | TEXT             | What's included                      |
+   | price            | DECIMAL          | Ticket price (0 = free)              |
+   | capacity         | INT              | Max tickets of this type             |
+   | sold             | INT              | How many sold so far                 |
+   | dynamic_pricing  | JSONB            | Early bird pricing config            |
+   | sales_start_date | TIMESTAMP        | When sales begin                     |
+   | sales_end_date   | TIMESTAMP        | When sales end                       |
+   | created_at       | TIMESTAMP        | When created                         |
+   | updated_at       | TIMESTAMP        | When last modified                   |
+   +------------------+------------------+--------------------------------------+
+
+5. BOOKINGS TABLE (bookings)
+   +-------------------+------------------+--------------------------------------+
+   | Column Name       | Data Type        | Description                          |
+   +-------------------+------------------+--------------------------------------+
+   | id                | UUID (Primary)   | Unique booking identifier            |
+   | user_id           | UUID (FK)        | References users.id                  |
+   | event_id          | UUID (FK)        | References events.id                 |
+   | ticket_type_id    | UUID (FK)        | References ticket_types.id           |
+   | quantity          | INT              | Number of tickets booked             |
+   | total_price       | DECIMAL          | Total amount paid                    |
+   | status            | ENUM             | 'confirmed', 'cancelled', 'attended' |
+   | booking_reference | VARCHAR (Unique) | EVT-20241211-1234 format             |
+   | payment_status    | ENUM             | 'pending', 'completed', 'refunded'   |
+   | payment_method    | VARCHAR          | UPI, Card, etc.                      |
+   | booked_at         | TIMESTAMP        | When booking was made                |
+   | cancelled_at      | TIMESTAMP        | When cancelled (if applicable)       |
+   | attended_at       | TIMESTAMP        | When marked as attended              |
+   | created_at        | TIMESTAMP        | Record creation time                 |
+   +-------------------+------------------+--------------------------------------+
+
+6. REVIEWS TABLE (reviews)
+   +--------------------+------------------+--------------------------------------+
+   | Column Name        | Data Type        | Description                          |
+   +--------------------+------------------+--------------------------------------+
+   | id                 | UUID (Primary)   | Unique review identifier             |
+   | user_id            | UUID (FK)        | References users.id                  |
+   | event_id           | UUID (FK)        | References events.id                 |
+   | rating             | INT              | 1 to 5 stars                         |
+   | comment            | TEXT             | Review text                          |
+   | media_files        | JSONB            | Array of image/video URLs            |
+   | is_verified_attendee| BOOLEAN         | Did they actually attend?            |
+   | created_at         | TIMESTAMP        | When review was written              |
+   | updated_at         | TIMESTAMP        | When review was edited               |
+   +--------------------+------------------+--------------------------------------+
+   
+   CONSTRAINT: One user can only review one event once (user_id + event_id is unique)
+
+7. WAITLIST TABLE (waitlists)
+   +------------------+------------------+--------------------------------------+
+   | Column Name      | Data Type        | Description                          |
+   +------------------+------------------+--------------------------------------+
+   | id               | UUID (Primary)   | Unique waitlist identifier           |
+   | user_id          | UUID (FK)        | References users.id                  |
+   | event_id         | UUID (FK)        | References events.id                 |
+   | ticket_type_id   | UUID (FK)        | References ticket_types.id           |
+   | status           | ENUM             | 'waiting', 'notified', 'expired'     |
+   | position         | INT              | Queue position (1 = first in line)   |
+   | notified_at      | TIMESTAMP        | When user was notified               |
+   | expires_at       | TIMESTAMP        | When notification expires            |
+   | created_at       | TIMESTAMP        | When joined waitlist                 |
+   +------------------+------------------+--------------------------------------+
+
+8. REPORTED_EVENTS TABLE (reported_events)
+   +------------------+------------------+--------------------------------------+
+   | Column Name      | Data Type        | Description                          |
+   +------------------+------------------+--------------------------------------+
+   | id               | UUID (Primary)   | Unique report identifier             |
+   | event_id         | UUID (FK)        | References events.id                 |
+   | reported_by_id   | UUID (FK)        | References users.id (who reported)   |
+   | reason           | TEXT             | Why event was reported               |
+   | status           | ENUM             | 'pending', 'reviewed', 'dismissed'   |
+   | reviewed_by_id   | UUID (FK)        | Admin who reviewed                   |
+   | reviewed_at      | TIMESTAMP        | When admin reviewed                  |
+   | created_at       | TIMESTAMP        | When report was filed                |
+   +------------------+------------------+--------------------------------------+
+
+
+================================================================================
+               PART 2: ENTRY POINT - HOW THE APPLICATION STARTS
+================================================================================
+
+When you run: npm run dev
+What happens: ts-node-dev executes src/server.ts
+
+FILE: server.ts (THE MAIN ENTRY POINT)
+--------------------------------------
+
+import 'reflect-metadata';           // Required by TypeORM for decorators
+import app from './app';             // The Express application
+import env from './config/env';      // Environment variables
+import { initializeDatabase } from './config/database';  // PostgreSQL connection
+import { connectRedis } from './config/redis';           // Redis connection
+
+const startServer = async () => {
+    try {
+        // STEP 1: Connect to PostgreSQL database
+        await initializeDatabase();
+        
+        // STEP 2: Connect to Redis cache server
+        await connectRedis();
+        console.log('Redis cache ready');
+        
+        // STEP 3: Start HTTP server on port 5000
+        const PORT = env.port || 5000;
+        app.listen(PORT, () => {
+            console.log(`Server started on port ${PORT}`)
+        })
+    } catch (error) {
+        console.error('Failed to start server:', error);
+    }
+};
+
+startServer();  // <-- This is what actually runs
+
+
+STARTUP SEQUENCE:
+-----------------
+1. server.ts starts
+2. initializeDatabase() connects to PostgreSQL
+3. connectRedis() connects to Redis
+4. app.listen() starts accepting HTTP requests on port 5000
+
+
+================================================================================
+           PART 3: HOW SERVER, REDIS & DATABASE CONNECT
+================================================================================
+
+1. ENVIRONMENT VARIABLES (config/env.ts)
+----------------------------------------
+Reads values from .env file:
+
+const env = {
+    port: 5000,                    // Server port
+    nodeEnv: 'development',        // development or production
+    database: {
+        host: 'localhost',         // PostgreSQL host
+        port: 5432,                // PostgreSQL port
+        username: 'postgres',      // Database user
+        password: 'your_password', // Database password
+        database: 'event_management', // Database name
+        synchronize: true,         // Auto-create tables from entities
+    },
+    jwt: {
+        secret: 'your-secret-key', // For signing JWT tokens
+        expiresIn: '7d',           // Tokens expire in 7 days
+    },
+};
+
+
+2. DATABASE CONNECTION (config/database.ts)
+-------------------------------------------
+Creates a TypeORM DataSource:
+
+export const AppDataSource = new DataSource({
+    type: 'postgres',              // Database type
+    host: env.database.host,       // localhost
+    port: env.database.port,       // 5432
+    username: env.database.username,
+    password: env.database.password,
+    database: env.database.database,
+    synchronize: true,             // Creates tables automatically from entities
+    entities: [User, Event, Category, TicketType, Booking, Review, Waitlist, ReportedEvent],
+});
+
+export const initializeDatabase = async () => {
+    await AppDataSource.initialize();  // Actually connects to PostgreSQL
+    console.log('Database connection established successfully');
+};
+
+
+3. REDIS CONNECTION (config/redis.ts)
+-------------------------------------
+Creates a Redis client:
+
+const redisClient = createClient({
+    url: "redis://localhost:6379"  // Redis server URL
+});
+
+redisClient.on('connect', () => {
+    console.log('Redis connected')
+});
+
+export const connectRedis = async () => {
+    if (!redisClient.isOpen) {
+        await redisClient.connect();  // Actually connects to Redis
+    }
+};
+
+
+================================================================================
+                    PART 4: FOLDER STRUCTURE EXPLAINED
+================================================================================
+
+backend/src/
+├── server.ts          # Entry point - starts everything
+├── app.ts             # Express app configuration + routes
+│
+├── config/            # Configuration files
+│   ├── env.ts         # Environment variables
+│   ├── database.ts    # PostgreSQL connection
+│   └── redis.ts       # Redis connection
+│
+├── entities/          # Database table definitions (TypeORM)
+│   ├── User.entity.ts
+│   ├── Event.entity.ts
+│   ├── Category.entity.ts
+│   ├── TicketType.entity.ts
+│   ├── Booking.entity.ts
+│   ├── Review.entity.ts
+│   ├── Waitlist.entity.ts
+│   └── ReportedEvent.entity.ts
+│
+├── routes/            # URL endpoint definitions
+│   ├── auth.routes.ts      # /api/auth/*
+│   ├── event.routes.ts     # /api/events/*
+│   ├── attendee.routes.ts  # /api/attendee/*
+│   ├── organizer.routes.ts # /api/organizer/*
+│   ├── admin.routes.ts     # /api/admin/*
+│   └── chatbot.routes.ts   # /api/chatbot/*
+│
+├── controllers/       # Business logic for each route
+│   ├── auth.controller.ts
+│   ├── event.controller.ts
+│   ├── attendee.controller.ts
+│   ├── organizer.controller.ts
+│   ├── admin.controller.ts
+│   └── chatbot.controller.ts
+│
+├── middlewares/       # Functions that run BEFORE controllers
+│   ├── auth.middleware.ts   # Verifies JWT token
+│   ├── role.middleware.ts   # Checks user role permissions
+│   └── error.middleware.ts  # Handles errors globally
+│
+├── services/          # Reusable business logic
+│   ├── cache.service.ts     # Redis caching operations
+│   └── chatbot.service.ts   # AI chatbot logic
+│
+├── utils/             # Helper functions
+│   ├── jwt.ts              # JWT token generate/verify
+│   ├── password.ts         # Password hashing
+│   ├── AppError.ts         # Custom error classes
+│   ├── asyncHandler.ts     # Async error wrapper
+│   └── responseBuilder.ts  # Standard API responses
+│
+└── validators/        # Input validation
+    └── auth.validator.ts
+
+
+================================================================================
+            PART 5: ROUTE DEFINITION - 3 COMPLETE EXAMPLES
+================================================================================
+
+Let me explain 3 routes in complete detail:
+
+ROUTE 1: POST /api/auth/login (No Authentication Required)
+-----------------------------------------------------------
+
+FILE: routes/auth.routes.ts
+---------------------------
+import { Router } from "express";
+import { AuthController } from "../controllers/auth.controller";
+import { authenticate } from "../middlewares/auth.middleware";
+
+const router = Router();
+const authController = new AuthController();
+
+router.post('/register', authController.register);
+router.post('/login', authController.login);           // <-- THIS ROUTE
+router.get('/me', authenticate, authController.getMe); // needs auth
+router.put('/profile', authenticate, authController.updateProfile);
+
+export default router;
+
+EXPLANATION:
+- router.post('/login', ...) means: When someone makes a POST request to /login
+- authController.login is the function that handles the request
+- There's NO middleware here, so no authentication needed
+
+
+FILE: controllers/auth.controller.ts
+------------------------------------
+export class AuthController {
+    private userRepository: Repository<User>; // Database access
+
+    constructor() {
+        // Get access to the Users table
+        this.userRepository = AppDataSource.getRepository(User);
+    }
+
+    login = asyncHandler(async (req: Request, res: Response) => {
+        // Step 1: Get email/password from request body
+        const { email, password } = req.body;
+
+        // Step 2: Validate input
+        if (!email || !this.validateEmail(email)) {
+            throw new ValidationError('Please provide a valid email');
+        }
+        if (!password) {
+            throw new ValidationError('Password is required');
+        }
+
+        // Step 3: Find user in database
+        const user = await this.userRepository.findOne({ where: { email } });
+
+        if (!user) {
+            throw new UnauthorizedError('Invalid email or password');
+        }
+
+        // Step 4: Check if user is blocked
+        if (user.status === UserStatus.BLOCKED) {
+            throw new UnauthorizedError('Your account has been blocked');
+        }
+
+        // Step 5: Verify password (compare hashed passwords)
+        const isPasswordValid = await comparePassword(password, user.password);
+
+        if (!isPasswordValid) {
+            throw new UnauthorizedError('Invalid email or password');
+        }
+
+        // Step 6: Generate JWT token
+        const token = generateToken({
+            userId: user.id,
+            email: user.email,
+            role: user.role,
+            status: user.status,
+        });
+
+        // Step 7: Send response back (without password)
+        const { password: _, ...userWithoutPassword } = user;
+        return sendSuccess(res, { user: userWithoutPassword, token }, 'Login successful');
+    });
+}
+
+
+--------------------------------------------------------------------------------
+
+ROUTE 2: GET /api/events/:id (No Authentication, Uses Caching)
+--------------------------------------------------------------
+
+FILE: routes/event.routes.ts
+----------------------------
+const router = Router();
+const eventController = new EventController();
+
+router.get('/', eventController.getEvents);
+router.get('/categories', eventController.getCategories);
+router.get('/:id', eventController.getEventById);  // <-- THIS ROUTE
+
+export default router;
+
+EXPLANATION:
+- router.get('/:id', ...) means: GET request to /api/events/{any-id}
+- The :id is a URL parameter (e.g., /api/events/abc123)
+- No authentication middleware = anyone can access
+
+
+FILE: controllers/event.controller.ts
+-------------------------------------
+export class EventController {
+    private eventRepository: Repository<Event>;
+    private categoryRepository: Repository<Category>;
+
+    constructor() {
+        this.eventRepository = AppDataSource.getRepository(Event);
+        this.categoryRepository = AppDataSource.getRepository(Category);
+    }
+
+    getEventById = asyncHandler(async (req: Request, res: Response) => {
+        // Step 1: Get event ID from URL
+        const { id } = req.params;  // /api/events/abc123 -> id = "abc123"
+        
+        const cacheKey = CacheKeys.EVENT_SINGLE + id; // "events:single:abc123"
+
+        // Step 2: Check Redis cache first (faster than database)
+        const cached = await cacheService.get(cacheKey);
+        if (cached) {
+            // Cache hit! Return cached data immediately
+            return sendSuccess(res, cached, 'Event details retrieved (cached)');
+        }
+
+        // Step 3: Not in cache, query database
+        const event = await this.eventRepository.findOne({
+            where: { id, isPublished: true },
+            relations: ['category', 'organizer', 'ticketTypes', 'reviews', 'reviews.user'],
+            // relations = JOIN these tables and include their data
+        });
+
+        if (!event) {
+            throw new NotFoundError('Event not found');
+        }
+
+        // Step 4: Calculate average rating
+        const avgRating = event.reviews.length > 0
+            ? event.reviews.reduce((sum, r) => sum + r.rating, 0) / event.reviews.length
+            : 0;
+
+        const eventData = {
+            ...event,
+            averageRating: avgRating,
+            totalReviews: event.reviews.length,
+        };
+
+        // Step 5: Store in Redis cache for 2 minutes (120 seconds)
+        await cacheService.set(cacheKey, { event: eventData }, 120);
+
+        // Step 6: Return response
+        return sendSuccess(res, { event: eventData }, 'Event details retrieved');
+    });
+}
+
+
+--------------------------------------------------------------------------------
+
+ROUTE 3: POST /api/attendee/bookings (Requires Authentication + Role)
+---------------------------------------------------------------------
+
+FILE: routes/attendee.routes.ts
+-------------------------------
+import { authenticate } from "../middlewares/auth.middleware";
+import { authorize } from "../middlewares/role.middleware";
+import { UserRole } from "../entities/User.entity";
+
+const router = Router();
+const attendeeController = new AttendeeController();
+
+// ALL routes in this file require authentication AND attendee role
+router.use(authenticate, authorize([UserRole.ATTENDEE]));
+
+router.post('/bookings', attendeeController.bookTicket);  // <-- THIS ROUTE
+router.get('/bookings', attendeeController.getMyBookings);
+router.delete('/bookings/:id', attendeeController.cancelBooking);
+
+export default router;
+
+EXPLANATION:
+- router.use(authenticate, authorize([...])) = apply these middlewares to ALL routes
+- authenticate = verify JWT token
+- authorize([UserRole.ATTENDEE]) = only allow users with role 'attendee'
+- If either fails, request stops and error is returned
+
+
+FILE: middlewares/auth.middleware.ts
+------------------------------------
+export const authenticate = (req: Request, res: Response, next: NextFunction) => {
+    try {
+        // Step 1: Get token from Authorization header
+        const authHeader = req.headers.authorization;
+        // Header looks like: "Bearer eyJhbGciOiJIUzI1NiIs..."
+
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+            throw new UnauthorizedError('No token provided');
+        }
+
+        // Step 2: Extract token (remove "Bearer " prefix)
+        const token = authHeader.substring(7);
+
+        // Step 3: Verify token is valid and not expired
+        const decoded = verifyToken(token);
+        // decoded = { userId: "abc123", email: "...", role: "attendee", status: "active" }
+
+        // Step 4: Attach user info to request object
+        req.user = decoded;
+
+        // Step 5: Continue to next middleware or controller
+        next();
+    } catch (error) {
+        next(new UnauthorizedError('Invalid or expired token'));
+    }
+};
+
+
+FILE: middlewares/role.middleware.ts
+------------------------------------
+export const authorize = (allowedRoles: UserRole[]) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        // Check if user exists (authenticate should have set this)
+        if (!req.user) {
+            throw new ForbiddenError('User not authenticated');
+        }
+
+        // Check if user's role is in the allowed list
+        if (!allowedRoles.includes(req.user.role)) {
+            throw new ForbiddenError('Access denied. Required roles: ' + allowedRoles.join(', '));
+        }
+
+        next(); // Role is allowed, continue
+    };
+};
+
+
+FILE: controllers/attendee.controller.ts
+----------------------------------------
+export class AttendeeController {
+    private ticketTypeRepository: Repository<TicketType>;
+    private eventRepository: Repository<Event>;
+    private bookingRepository: Repository<Booking>;
+
+    constructor() {
+        this.ticketTypeRepository = AppDataSource.getRepository(TicketType);
+        this.eventRepository = AppDataSource.getRepository(Event);
+        this.bookingRepository = AppDataSource.getRepository(Booking);
+    }
+
+    bookTicket = asyncHandler(async (req: Request, res: Response) => {
+        // Step 1: Get user ID from JWT token (set by authenticate middleware)
+        const userId = req.user!.userId;
+        
+        // Step 2: Get booking details from request body
+        const { eventId, ticketTypeId, quantity } = req.body;
+
+        // Step 3: Validate input
+        if (!eventId || !ticketTypeId || !quantity) {
+            throw new ValidationError('Event ID, Ticket Type ID, and quantity are required');
+        }
+
+        // Step 4: Use DATABASE TRANSACTION to prevent race conditions
+        const booking = await AppDataSource.transaction(async (transactionalEntityManager) => {
+            
+            // Step 4a: Lock ticket type row (prevent double booking)
+            const ticketType = await transactionalEntityManager
+                .getRepository(TicketType)
+                .createQueryBuilder('ticketType')
+                .setLock('pessimistic_write')  // <-- DATABASE LOCK
+                .where('ticketType.id = :id', { id: ticketTypeId })
+                .getOne();
+
+            if (!ticketType) {
+                throw new NotFoundError('Ticket type not found');
+            }
+
+            // Step 4b: Check event exists and is published
+            const event = await transactionalEntityManager
+                .getRepository(Event)
+                .findOne({ where: { id: eventId } });
+
+            if (!event || !event.isPublished) {
+                throw new ValidationError('Event not available for booking');
+            }
+
+            // Step 4c: Check ticket availability
+            const available = ticketType.capacity - ticketType.sold;
+            if (available < quantity) {
+                throw new ValidationError(`Only ${available} tickets available`);
+            }
+
+            // Step 4d: Calculate total price
+            const totalPrice = Number(ticketType.price) * quantity;
+
+            // Step 4e: Create booking record
+            const newBooking = transactionalEntityManager.getRepository(Booking).create({
+                userId,
+                eventId,
+                ticketTypeId,
+                quantity,
+                totalPrice,
+                status: BookingStatus.CONFIRMED,
+            });
+
+            await transactionalEntityManager.getRepository(Booking).save(newBooking);
+
+            // Step 4f: Update sold count
+            ticketType.sold += quantity;
+            await transactionalEntityManager.getRepository(TicketType).save(ticketType);
+
+            return newBooking;
+        });
+        // Transaction ends here - all changes committed or rolled back
+
+        // Step 5: Invalidate cache (ticket counts changed)
+        await cacheService.del(CacheKeys.EVENT_SINGLE + eventId);
+
+        // Step 6: Return success response
+        return sendSuccess(res, { booking }, 'Ticket booked successfully', 201);
+    });
+}
+
+
+================================================================================
+                PART 6: COMPLETE REQUEST FLOW WALKTHROUGH
+================================================================================
+
+Let's trace a complete request from start to finish:
+
+EXAMPLE: User books a ticket
+----------------------------
+Request: POST /api/attendee/bookings
+Headers: { Authorization: "Bearer eyJhbGci..." }
+Body: { eventId: "event-123", ticketTypeId: "ticket-456", quantity: 2 }
+
+
+STEP-BY-STEP FLOW:
+==================
+
+1. HTTP REQUEST ARRIVES
+   → Express server receives POST to /api/attendee/bookings
+   
+2. app.ts MIDDLEWARE CHAIN
+   → express.json() parses request body
+   → cors() allows cross-origin requests
+
+3. ROUTE MATCHING
+   → app.use('/api/attendee', attendeeRoutes)
+   → Request matches /api/attendee/bookings
+
+4. ROUTE-LEVEL MIDDLEWARE (attendee.routes.ts)
+   → router.use(authenticate, authorize([UserRole.ATTENDEE]))
+
+5. AUTHENTICATE MIDDLEWARE
+   → Extracts "Bearer eyJhbGci..." from Authorization header
+   → Removes "Bearer " prefix
+   → Calls verifyToken() from utils/jwt.ts
+   → JWT library decodes: { userId, email, role, status }
+   → Attaches to req.user
+   → Calls next()
+
+6. AUTHORIZE MIDDLEWARE
+   → Checks if req.user.role === 'attendee'
+   → If yes, calls next()
+   → If no, throws ForbiddenError
+
+7. CONTROLLER (attendeeController.bookTicket)
+   → Gets userId from req.user.userId
+   → Gets eventId, ticketTypeId, quantity from req.body
+   → Validates input
+   → Starts database transaction
+   → Locks ticket type row
+   → Checks event exists
+   → Checks availability
+   → Creates booking
+   → Updates sold count
+   → Commits transaction
+   → Invalidates Redis cache
+   → Returns response
+
+8. RESPONSE BUILDER
+   → sendSuccess() formats response:
+   {
+       success: true,
+       message: "Ticket booked successfully",
+       data: { booking: {...} }
+   }
+
+9. RESPONSE SENT TO CLIENT
+   → 201 Created status code
+   → JSON response body
+
+
+ERROR FLOW:
+===========
+If any step throws an error:
+→ asyncHandler catches it
+→ Passes to next(error)
+→ errorHandler middleware catches it
+→ Formats error response:
+{
+    success: false,
+    message: "Error message here"
+}
+
+
+================================================================================
+                     PART 7: UTILITY FILES EXPLAINED
+================================================================================
+
+1. utils/jwt.ts - JWT Token Handling
+------------------------------------
+PURPOSE: Create and verify authentication tokens
+
+export interface JwtPayload {
+    userId: string;      // User's unique ID
+    email: string;       // User's email
+    role: UserRole;      // 'admin', 'organizer', or 'attendee'
+    status: UserStatus;  // 'active', 'pending', or 'blocked'
+}
+
+// Creates a token that expires in 7 days
+export const generateToken = (payload: JwtPayload): string => {
+    return jwt.sign(payload, env.jwt.secret, { expiresIn: '7d' });
+};
+
+// Verifies token and returns decoded payload
+export const verifyToken = (token: string): JwtPayload => {
+    return jwt.verify(token, env.jwt.secret) as JwtPayload;
+};
+
+
+2. utils/password.ts - Password Security
+----------------------------------------
+PURPOSE: Hash passwords before storing, compare during login
+
+const SALT_ROUNDS = 10;  // How complex the hashing should be
+
+// Hash password before saving to database
+export const hashPassword = async (password: string): Promise<string> => {
+    return await bcrypt.hash(password, SALT_ROUNDS);
+    // "password123" → "$2a$10$xyz..."
+};
+
+// Compare plain password with hashed password
+export const comparePassword = async (password: string, hashedPassword: string): Promise<boolean> => {
+    return await bcrypt.compare(password, hashedPassword);
+    // Returns true if they match
+};
+
+
+3. utils/AppError.ts - Custom Error Classes
+-------------------------------------------
+PURPOSE: Throw specific errors with proper HTTP status codes
+
+// Base error class
+export class AppError extends Error {
+    statusCode: number;
+    isOperational: boolean;
+
+    constructor(message: string, statusCode: number) {
+        super(message);
+        this.statusCode = statusCode;
+        this.isOperational = true;
+    }
+}
+
+// 400 Bad Request - Invalid input
+export class ValidationError extends AppError {
+    constructor(message: string) {
+        super(message, 400);
+    }
+}
+
+// 401 Unauthorized - Not logged in or bad token
+export class UnauthorizedError extends AppError {
+    constructor(message: string = 'Unauthorized') {
+        super(message, 401);
+    }
+}
+
+// 403 Forbidden - Logged in but not allowed
+export class ForbiddenError extends AppError {
+    constructor(message: string = 'Forbidden') {
+        super(message, 403);
+    }
+}
+
+// 404 Not Found - Resource doesn't exist
+export class NotFoundError extends AppError {
+    constructor(message: string = 'Resource not found') {
+        super(message, 404);
+    }
+}
+
+// 409 Conflict - Already exists
+export class ConflictError extends AppError {
+    constructor(message: string) {
+        super(message, 409);
+    }
+}
+
+
+4. utils/asyncHandler.ts - Async Error Wrapper
+----------------------------------------------
+PURPOSE: Catch errors in async functions and pass to error middleware
+
+type AsyncFunction = (req: Request, res: Response, next: NextFunction) => Promise<any>;
+
+export const asyncHandler = (fn: AsyncFunction) => {
+    return (req: Request, res: Response, next: NextFunction) => {
+        Promise.resolve(fn(req, res, next)).catch(next);
+        // If fn() throws error, catch it and call next(error)
+    }
+};
+
+USAGE IN CONTROLLER:
+// Instead of:
+login = async (req, res, next) => {
+    try {
+        // ... logic
+    } catch (error) {
+        next(error);
+    }
+};
+
+// You can write:
+login = asyncHandler(async (req, res) => {
+    // ... logic (errors automatically caught)
+});
+
+
+5. utils/responseBuilder.ts - Standard Responses
+------------------------------------------------
+PURPOSE: Consistent API response format
+
+// Success response
+export const sendSuccess = (res: Response, data: any, message?: string, statusCode = 200) => {
+    return res.status(statusCode).json({
+        success: true,
+        data,
+        message,
+    });
+};
+
+// Error response
+export const sendError = (res: Response, error: string, statusCode = 500) => {
+    return res.status(statusCode).json({
+        success: false,
+        error,
+    });
+};
+
+
+6. middlewares/error.middleware.ts - Global Error Handler
+---------------------------------------------------------
+PURPOSE: Catch all errors and send proper response
+
+export const errorHandler = (err: Error | AppError, req, res, next) => {
+    if (err instanceof AppError) {
+        // Our custom errors - use their status code
+        return res.status(err.statusCode).json({
+            success: false,
+            message: err.message,
+        });
+    }
+    // Unknown errors - return 500
+    console.error('Error:', err);
+    return res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+    });
+};
+
+
+7. services/cache.service.ts - Redis Caching
+--------------------------------------------
+PURPOSE: Store frequently accessed data in Redis for faster retrieval
+
+export const CacheKeys = {
+    EVENTS_LIST: 'events:list:',      // For event list queries
+    EVENT_SINGLE: 'events:single:',   // For single event details
+    CATEGORIES: 'categories:all',     // For all categories
+};
+
+export const cacheService = {
+    // Get value from cache
+    get: async <T>(key: string): Promise<T | null> => {
+        const data = await redisClient.get(key);
+        return data ? JSON.parse(data) : null;
+    },
+
+    // Store value in cache with expiration time
+    set: async (key: string, value: any, ttlSeconds: number = 60) => {
+        await redisClient.setEx(key, ttlSeconds, JSON.stringify(value));
+    },
+
+    // Delete specific cache entry
+    del: async (key: string) => {
+        await redisClient.del(key);
+    },
+
+    // Delete all entries matching pattern
+    delByPattern: async (pattern: string) => {
+        const keys = await redisClient.keys(pattern);
+        if (keys.length > 0) {
+            await redisClient.del(keys);
+        }
+    },
+};
+
+USAGE EXAMPLE:
+// Before fetching from DB, check cache
+const cached = await cacheService.get(CacheKeys.EVENT_SINGLE + id);
+if (cached) return sendSuccess(res, cached, 'From cache');
+
+// Fetch from DB
+const event = await eventRepository.findOne({...});
+
+// Store in cache for 2 minutes
+await cacheService.set(CacheKeys.EVENT_SINGLE + id, event, 120);
+
+
+================================================================================
+                      PART 8: KEY CONCEPTS SUMMARY
+================================================================================
+
+1. HOW ENTITIES MAP TO DATABASE:
+   User.entity.ts → creates 'users' table in PostgreSQL
+   @Entity('users') = table name
+   @Column() = table column
+   @PrimaryGeneratedColumn() = auto-generated primary key
+   @ManyToOne/@OneToMany = relationship with other tables
+
+2. HOW ROUTES WORK:
+   Route file defines: WHAT URL + WHAT METHOD + WHICH FUNCTION
+   Example: router.post('/login', authController.login)
+   = POST request to /login runs authController.login function
+
+3. HOW MIDDLEWARE WORKS:
+   Middleware runs BEFORE the controller
+   Can modify request, check permissions, or stop request
+   Call next() to continue, throw error to stop
+
+4. HOW AUTHENTICATION WORKS:
+   1. User logs in with email/password
+   2. Server verifies and creates JWT token
+   3. Token contains: userId, email, role, status
+   4. Client sends token in Authorization header
+   5. Server verifies token on each request
+   6. User info available in req.user
+
+5. HOW CACHING WORKS:
+   1. Check Redis before database query
+   2. If found in Redis: return immediately (fast!)
+   3. If not found: query database, then store in Redis
+   4. When data changes: delete cache entry (invalidate)
+
+6. HOW TRANSACTIONS WORK:
+   1. Start transaction
+   2. Lock rows to prevent concurrent access
+   3. Make all changes (booking, update sold count)
+   4. Commit = save all changes together
+   5. If error: rollback = undo all changes
+
+7. HOW ERRORS FLOW:
+   Controller throws error → asyncHandler catches → next(error) called
+   → errorHandler middleware receives → formats and sends response
+
+================================================================================
+                              END OF DOCUMENT
+================================================================================

@@ -1,0 +1,451 @@
+================================================================================
+          FULL-STACK FLOW #4: ADMIN FEATURES
+          End-to-End: Dashboard, User Management, Organizer Approvals
+================================================================================
+
+This document explains the complete admin flow for platform management.
+
+================================================================================
+PART 1: ADMIN DASHBOARD
+================================================================================
+
+PAGE: /admin/dashboard (AdminDashboard.tsx)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Admin Dashboard                                                              │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  PLATFORM STATISTICS                                                          │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
+│  │     152      │  │      25      │  │      3       │  │     127      │     │
+│  │ Total Users  │  │  Organizers  │  │   Pending    │  │  Attendees   │     │
+│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────┘     │
+│                                                                              │
+│  ┌──────────────┐  ┌──────────────┐                                         │
+│  │      45      │  │      5       │                                         │
+│  │ Total Events │  │  Reports     │                                         │
+│  └──────────────┘  └──────────────┘                                         │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  QUICK ACTIONS                                                               │
+│  [Pending Organizers (3)] [Reported Events (5)] [Manage Users]              │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+API CALL:
+    GET /api/admin/dashboard
+
+
+BACKEND (admin.controller.ts - getDashboard):
+    getDashboard = asyncHandler(async (req, res) => {
+        // Count total users
+        const totalUsers = await this.userRepository.count();
+        
+        // Count active organizers
+        const totalOrganizers = await this.userRepository.count({
+            where: { role: UserRole.ORGANIZER, status: UserStatus.ACTIVE }
+        });
+        
+        // Count pending organizers (need approval)
+        const pendingOrganizers = await this.userRepository.count({
+            where: { role: UserRole.ORGANIZER, status: UserStatus.PENDING }
+        });
+        
+        // Count attendees
+        const totalAttendees = await this.userRepository.count({
+            where: { role: UserRole.ATTENDEE }
+        });
+        
+        // Count events
+        const totalEvents = await this.eventRepository.count();
+        
+        // Count pending reports
+        const reportedEvents = await this.reportRepository.count({
+            where: { status: ReportStatus.PENDING }
+        });
+        
+        return sendSuccess(res, {
+            totalUsers,
+            totalOrganizers,
+            totalAttendees,
+            pendingOrganizers,
+            totalEvents,
+            reportedEvents,
+        });
+    });
+
+
+================================================================================
+PART 2: PENDING ORGANIZERS APPROVAL
+================================================================================
+
+PAGE: /admin/organizers/pending (PendingOrganizersPage.tsx)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Pending Organizer Approvals                                                  │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ John Smith                                           Requested: Jan 10 │ │
+│  │ john.smith@email.com                                                   │ │
+│  │ Phone: +1 234-567-8900                                                 │ │
+│  │                                           [✓ Approve]  [✗ Reject]      │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ Jane Doe                                             Requested: Jan 12 │ │
+│  │ jane.doe@email.com                                                     │ │
+│  │ Phone: +1 987-654-3210                                                 │ │
+│  │                                           [✓ Approve]  [✗ Reject]      │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+FRONTEND FLOW:
+    1. Page loads → GET /api/admin/pending-organizers
+    2. Display list of pending organizers
+    3. Admin clicks Approve/Reject button
+    4. API call to approve/reject
+    5. Refresh list
+
+
+API CALLS:
+    GET /api/admin/pending-organizers        ← Get list
+    POST /api/admin/organizers/:id/approve   ← Approve
+    POST /api/admin/organizers/:id/reject    ← Reject
+
+
+BACKEND - Get Pending (admin.controller.ts):
+    getPendingOrganizers = asyncHandler(async (req, res) => {
+        const organizers = await this.userRepository.find({
+            where: {
+                role: UserRole.ORGANIZER,
+                status: UserStatus.PENDING,
+            },
+            select: ['id', 'email', 'firstName', 'lastName', 'phoneNumber', 'createdAt'],
+            order: { createdAt: 'ASC' },  // Oldest first
+        });
+        
+        return sendSuccess(res, { organizers });
+    });
+
+
+BACKEND - Approve (admin.controller.ts):
+    approveOrganizer = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        
+        const user = await this.userRepository.findOne({ where: { id } });
+        
+        if (!user) throw new NotFoundError("User Not Found");
+        if (user.role !== UserRole.ORGANIZER) {
+            throw new ForbiddenError("User is not an organizer");
+        }
+        if (user.status !== UserStatus.PENDING) {
+            throw new ForbiddenError("User is not pending approval");
+        }
+        
+        // Update status to active
+        user.status = UserStatus.ACTIVE;
+        await this.userRepository.save(user);
+        
+        return sendSuccess(res, { message: 'Organizer Approved Successfully' });
+    });
+
+    SQL: UPDATE users SET status = 'active' WHERE id = 'uuid';
+
+
+BACKEND - Reject (admin.controller.ts):
+    rejectOrganizer = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        
+        const user = await this.userRepository.findOne({ where: { id } });
+        
+        if (!user) throw new NotFoundError("User Not Found");
+        if (user.role !== UserRole.ORGANIZER) {
+            throw new ForbiddenError("User is not an organizer");
+        }
+        if (user.status !== UserStatus.PENDING) {
+            throw new ForbiddenError("User is not pending approval");
+        }
+        
+        // Delete the user account
+        await this.userRepository.remove(user);
+        
+        return sendSuccess(res, { message: 'Organizer Rejected and account deleted' });
+    });
+
+    SQL: DELETE FROM users WHERE id = 'uuid';
+
+
+================================================================================
+PART 3: USER MANAGEMENT
+================================================================================
+
+PAGE: /admin/users (ManageUsersPage.tsx)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Manage Users                                                                 │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  Search: [________________]  Role: [All ▼]  Status: [All ▼]                 │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  NAME            │ EMAIL              │ ROLE      │ STATUS  │ ACTIONS       │
+│  ────────────────┼────────────────────┼───────────┼─────────┼───────────────│
+│  John Doe        │ john@email.com     │ Attendee  │ Active  │ [Block]       │
+│  Jane Smith      │ jane@email.com     │ Organizer │ Active  │ [Block]       │
+│  Bob Wilson      │ bob@email.com      │ Attendee  │ Blocked │ [Unblock]     │
+│  Alice Brown     │ alice@email.com    │ Organizer │ Pending │ [Approve]     │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  [1] [2] [3] ... [8]                                        Showing 1-20/152 │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+API CALLS:
+    GET /api/admin/users?page=1&limit=20     ← Get users with pagination
+    PATCH /api/admin/users/:id/status        ← Update user status
+
+
+BACKEND - Get All Users (admin.controller.ts):
+    getAllUsers = asyncHandler(async (req, res) => {
+        const page = parseInt(req.query.page) || 1;
+        const limit = parseInt(req.query.limit) || 20;
+        
+        const [users, total] = await this.userRepository.findAndCount({
+            select: ['id', 'email', 'firstName', 'lastName', 'role', 'status', 'createdAt'],
+            skip: (page - 1) * limit,
+            take: limit,
+            order: { createdAt: 'DESC' },
+        });
+        
+        return sendSuccess(res, {
+            users,
+            pagination: {
+                total,
+                page,
+                limit,
+                totalPages: Math.ceil(total / limit),
+            },
+        });
+    });
+
+
+BACKEND - Update User Status (admin.controller.ts):
+    updateUserStatus = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const { status } = req.body;
+        
+        // Validation
+        if (!['active', 'blocked', 'pending'].includes(status)) {
+            throw new ValidationError('Status must be active, blocked, or pending');
+        }
+        
+        const user = await this.userRepository.findOne({ where: { id } });
+        
+        if (!user) throw new NotFoundError('User not found');
+        
+        user.status = status;
+        await this.userRepository.save(user);
+        
+        return sendSuccess(res, { message: `User status updated to ${status}` });
+    });
+
+
+STATUS EFFECTS:
+    - 'active': User can access all their role features
+    - 'blocked': User cannot login (rejected at auth middleware)
+    - 'pending': Organizer waiting for approval (rejected at checkOrganizerStatus)
+
+
+================================================================================
+PART 4: REPORTED EVENTS
+================================================================================
+
+PAGE: /admin/reports (ReportedEventsPage.tsx)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Reported Events                                                              │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ REPORTED EVENT: Concert 2024                                           │ │
+│  │ Organizer: John Smith (john@email.com)                                 │ │
+│  │ ─────────────────────────────────────────────────────────────────────  │ │
+│  │ Report Reason: "This event contains inappropriate content..."          │ │
+│  │ Reported by: Jane Doe on Jan 15, 2024                                  │ │
+│  │                                                                         │ │
+│  │                        [Dismiss Report]  [Delete Event]                 │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ REPORTED EVENT: Fake Workshop                                          │ │
+│  │ ...                                                                     │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+HOW EVENTS GET REPORTED:
+    1. Attendee views event they find inappropriate
+    2. Clicks "Report Event" button
+    3. Enters reason
+    4. POST /api/events/:id/report
+    5. Creates ReportedEvent record
+    6. Admin sees in dashboard
+
+
+API CALLS:
+    GET /api/admin/reported-events           ← Get list
+    POST /api/admin/reported-events/:id/resolve   ← Dismiss report
+    DELETE /api/admin/events/:id             ← Delete event
+
+
+BACKEND - Get Reported Events (admin.controller.ts):
+    getReportedEvents = asyncHandler(async (req, res) => {
+        const reports = await this.reportRepository.find({
+            where: { status: ReportStatus.PENDING },
+            relations: ['event', 'event.organizer', 'reportedBy'],
+            order: { createdAt: 'DESC' },
+        });
+        
+        return sendSuccess(res, { reports });
+    });
+
+
+BACKEND - Resolve Report (Dismiss):
+    resolveReport = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const { adminNotes } = req.body;
+        
+        const report = await this.reportRepository.findOne({
+            where: { id },
+            relations: ['event'],
+        });
+        
+        if (!report) throw new NotFoundError("Report Not Found");
+        
+        report.status = ReportStatus.RESOLVED;
+        report.adminNotes = adminNotes;
+        report.resolvedAt = new Date();
+        
+        await this.reportRepository.save(report);
+        
+        return sendSuccess(res, { message: 'Report Resolved' });
+    });
+
+
+BACKEND - Delete Event (admin.controller.ts):
+    deleteEvent = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        
+        const event = await this.eventRepository.findOne({ where: { id } });
+        
+        if (!event) throw new NotFoundError('Event Not Found');
+        
+        await this.eventRepository.remove(event);
+        
+        return sendSuccess(res, { message: 'Event Deleted Successfully' });
+    });
+
+
+================================================================================
+PART 5: ALL ADMIN API ROUTES
+================================================================================
+
+FILE: /backend/src/routes/admin.routes.ts
+
+    // All routes require admin authentication
+    router.use(authenticate, authorize([UserRole.ADMIN]));
+    
+    // Dashboard
+    GET  /admin/dashboard                      → getDashboard
+    
+    // User management
+    GET  /admin/users                          → getAllUsers
+    PATCH /admin/users/:id/status              → updateUserStatus
+    
+    // Organizer management
+    GET  /admin/pending-organizers             → getPendingOrganizers
+    POST /admin/organizers/:id/approve         → approveOrganizer
+    POST /admin/organizers/:id/reject          → rejectOrganizer
+    
+    // Reported Events
+    GET  /admin/reported-events                → getReportedEvents
+    POST /admin/reported-events/:id/resolve    → resolveReport
+    
+    // Event management
+    DELETE /admin/events/:id                   → deleteEvent
+
+
+ROUTE PROTECTION:
+    router.use(authenticate, authorize([UserRole.ADMIN]));
+    
+    authenticate: Verifies JWT token, sets req.user
+    authorize([UserRole.ADMIN]): Checks req.user.role === 'admin'
+        If not admin → 403 Forbidden
+
+
+================================================================================
+PART 6: DATABASE TABLES INVOLVED
+================================================================================
+
+USERS TABLE:
+    id            UUID PRIMARY KEY
+    email         VARCHAR UNIQUE
+    password      VARCHAR (hashed)
+    firstName     VARCHAR
+    lastName      VARCHAR
+    role          ENUM ('admin', 'organizer', 'attendee')
+    status        ENUM ('active', 'pending', 'blocked')
+    phoneNumber   VARCHAR
+    createdAt     TIMESTAMP
+    updatedAt     TIMESTAMP
+
+
+REPORTED_EVENTS TABLE:
+    id            UUID PRIMARY KEY
+    eventId       UUID FOREIGN KEY → events
+    reportedById  UUID FOREIGN KEY → users
+    reason        TEXT
+    status        ENUM ('pending', 'resolved', 'dismissed')
+    adminNotes    TEXT
+    createdAt     TIMESTAMP
+    resolvedAt    TIMESTAMP
+
+
+================================================================================
+SUMMARY: ADMIN FLOW
+================================================================================
+
+DASHBOARD:
+    Admin logs in → /admin/dashboard → See platform stats
+         ↓
+    GET /api/admin/dashboard
+         ↓
+    Count queries on users, events, reports tables
+
+APPROVE ORGANIZER:
+    Dashboard → Pending Organizers → View organizer details → Approve
+         ↓
+    POST /api/admin/organizers/:id/approve
+         ↓
+    UPDATE users SET status = 'active' WHERE id = :id
+
+REJECT ORGANIZER:
+    Pending Organizers → Reject
+         ↓
+    POST /api/admin/organizers/:id/reject
+         ↓
+    DELETE FROM users WHERE id = :id
+
+BLOCK USER:
+    Manage Users → Click Block
+         ↓
+    PATCH /api/admin/users/:id/status { status: 'blocked' }
+         ↓
+    User can no longer login
+
+HANDLE REPORT:
+    Dashboard → Reported Events → View report details
+         ↓
+    Either: Resolve (dismiss) → Report marked resolved
+    Or: Delete Event → Event removed from platform
+
+================================================================================

@@ -1,0 +1,634 @@
+================================================================================
+          TICKET TYPES & EARLY BIRD PRICING - COMPLETE LOGIC
+          Database → Backend → Frontend: How Dynamic Pricing Works
+================================================================================
+
+This document explains the complete ticket type system with early bird pricing.
+
+================================================================================
+PART 1: TICKET TYPES OVERVIEW
+================================================================================
+
+WHAT IS A TICKET TYPE?
+    An event can have multiple ticket types, each with its own:
+    - Name (e.g., "Regular", "VIP", "Student")
+    - Price (can be $0 for free tickets)
+    - Capacity (how many tickets available)
+    - Sold count (tracks how many sold)
+    - Dynamic Pricing (optional - for early bird pricing)
+
+
+EXAMPLE EVENT SETUP:
+    Event: "Summer Concert 2024"
+    ├── Regular Ticket: FREE, 500 capacity
+    └── VIP Ticket: $99, 50 capacity
+        └── Early Bird: First 20 tickets at $49
+
+
+================================================================================
+PART 2: DATABASE STRUCTURE
+================================================================================
+
+TABLE: ticket_types
+
+    Column              Type            Description
+    ────────────────────────────────────────────────────────────────────────
+    id                  UUID            Primary key
+    event_id            UUID            Foreign key → events table
+    name                VARCHAR         "Regular", "VIP", etc.
+    description         TEXT            Optional description
+    price               DECIMAL(10,2)   Current price (or early bird price)
+    capacity            INT             Total tickets available
+    sold                INT             Tickets already sold (starts at 0)
+    dynamic_pricing     JSONB           Early bird config (nullable)
+    sales_start_date    TIMESTAMP       When sales start (optional)
+    sales_end_date      TIMESTAMP       When sales end (optional)
+    created_at          TIMESTAMP       Auto-generated
+    updated_at          TIMESTAMP       Auto-updated
+
+
+THE dynamic_pricing COLUMN (JSONB):
+    This stores early bird configuration as JSON:
+    
+    {
+        "type": "early_bird",
+        "originalPrice": 99.99,       // Regular price after early bird ends
+        "earlyBirdQuantity": 20,      // How many tickets at discounted price
+        "earlyBirdPrice": 49.99       // Discounted early bird price
+    }
+    
+    NULL means no dynamic pricing - simple fixed price ticket.
+
+
+EXAMPLE DATABASE ROWS:
+
+    Regular Ticket:
+    ┌────────────────────────────────────────────────────────────────────────┐
+    │ id: "ticket-uuid-1"                                                    │
+    │ event_id: "event-uuid"                                                 │
+    │ name: "Regular"                                                        │
+    │ price: 0.00                                                            │
+    │ capacity: 500                                                          │
+    │ sold: 150                                                              │
+    │ dynamic_pricing: NULL                                                  │
+    └────────────────────────────────────────────────────────────────────────┘
+
+    VIP with Early Bird:
+    ┌────────────────────────────────────────────────────────────────────────┐
+    │ id: "ticket-uuid-2"                                                    │
+    │ event_id: "event-uuid"                                                 │
+    │ name: "VIP"                                                            │
+    │ price: 49.99          ← Currently showing early bird price             │
+    │ capacity: 50                                                           │
+    │ sold: 15              ← 15 sold, 5 more early bird left                │
+    │ dynamic_pricing: {                                                     │
+    │     "type": "early_bird",                                              │
+    │     "originalPrice": 99.99,                                            │
+    │     "earlyBirdQuantity": 20,                                           │
+    │     "earlyBirdPrice": 49.99                                            │
+    │ }                                                                      │
+    └────────────────────────────────────────────────────────────────────────┘
+
+
+ENTITY FILE: /backend/src/entities/TicketType.entity.ts
+
+    @Entity('ticket_types')
+    export class TicketType {
+        @PrimaryGeneratedColumn('uuid')
+        id: string;
+
+        @Column({ name: 'event_id' })
+        eventId: string;
+
+        @Column()
+        name: string;
+
+        @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+        price: number;
+
+        @Column({ type: 'int' })
+        capacity: number;
+
+        @Column({ type: 'int', default: 0 })
+        sold: number;
+
+        @Column({ name: 'dynamic_pricing', type: 'jsonb', nullable: true })
+        dynamicPricing: {
+            type: string;
+            originalPrice?: number;
+            earlyBirdQuantity?: number;
+            earlyBirdPrice?: number;
+        } | null;
+
+        // Virtual property - not stored in DB
+        get available(): number {
+            return this.capacity - this.sold;
+        }
+    }
+
+
+================================================================================
+PART 3: CREATING TICKETS (ORGANIZER FLOW)
+================================================================================
+
+FRONTEND: CreateEventPage.tsx
+
+When organizer creates an event with VIP + Early Bird:
+
+STATE:
+    const [vipTicket, setVipTicket] = useState({
+        enabled: true,
+        capacity: 50,
+        price: 99.99,      // Regular price
+    });
+    
+    const [earlyBird, setEarlyBird] = useState({
+        enabled: true,
+        quantity: 20,      // First 20 tickets
+        price: 49.99,      // At discounted price
+    });
+
+
+FORM SUBMISSION - Building ticketTypes array:
+
+    const ticketTypes = [];
+    
+    if (vipTicket.enabled) {
+        const vipData = {
+            name: 'VIP',
+            description: earlyBird.enabled
+                ? `First ${earlyBird.quantity} at $${earlyBird.price}, then $${vipTicket.price}`
+                : 'VIP access',
+            price: earlyBird.enabled ? earlyBird.price : vipTicket.price,
+            //     ^^^^^^^^^^^^^^^^
+            //     Start with early bird price as the displayed price!
+            capacity: vipTicket.capacity,
+        };
+        
+        if (earlyBird.enabled) {
+            vipData.dynamicPricing = {
+                type: 'early_bird',
+                originalPrice: vipTicket.price,    // $99.99 (after early bird)
+                earlyBirdQuantity: earlyBird.quantity, // 20
+                earlyBirdPrice: earlyBird.price,   // $49.99
+            };
+        }
+        
+        ticketTypes.push(vipData);
+    }
+
+
+API REQUEST:
+    POST /api/organizer/events
+    Body: {
+        title: "Concert 2024",
+        ...
+        ticketTypes: [
+            {
+                name: "VIP",
+                price: 49.99,
+                capacity: 50,
+                dynamicPricing: {
+                    type: "early_bird",
+                    originalPrice: 99.99,
+                    earlyBirdQuantity: 20,
+                    earlyBirdPrice: 49.99
+                }
+            }
+        ]
+    }
+
+
+BACKEND: organizer.controller.ts - createEvent()
+
+    // Create ticket types from request
+    for (const ticketData of ticketTypesData) {
+        await this.ticketTypeRepository.save(
+            this.ticketTypeRepository.create({
+                eventId: newEvent.id,
+                name: ticketData.name,
+                description: ticketData.description,
+                price: ticketData.price,           // Saves $49.99 (early bird)
+                capacity: ticketData.capacity,
+                sold: 0,
+                dynamicPricing: ticketData.dynamicPricing,  // Saves the JSON
+            })
+        );
+    }
+
+
+DATABASE INSERT:
+    INSERT INTO ticket_types (id, event_id, name, price, capacity, sold, dynamic_pricing)
+    VALUES (uuid, event_uuid, 'VIP', 49.99, 50, 0, 
+            '{"type":"early_bird","originalPrice":99.99,"earlyBirdQuantity":20,"earlyBirdPrice":49.99}');
+
+
+================================================================================
+PART 4: DISPLAYING TICKETS (FRONTEND LOGIC)
+================================================================================
+
+FRONTEND: EventDetailsPage.tsx
+
+When displaying ticket cards, we check for active early bird:
+
+    event.ticketTypes.map((ticket) => {
+        // Get dynamic pricing config
+        const dp = ticket.dynamicPricing;
+        
+        // Check if early bird exists and is quantity-based
+        const hasEarlyBird = dp?.type === 'early_bird' && dp?.earlyBirdQuantity !== undefined;
+        
+        // Calculate remaining early bird tickets
+        const earlyBirdRemaining = hasEarlyBird 
+            ? Math.max(0, dp.earlyBirdQuantity - ticket.sold)
+            : 0;
+        
+        // Is early bird still active?
+        const isEarlyBirdActive = hasEarlyBird && earlyBirdRemaining > 0;
+        
+        // Determine current price to show
+        const currentPrice = isEarlyBirdActive 
+            ? dp.earlyBirdPrice      // Show $49.99
+            : dp?.originalPrice || ticket.price;  // Show $99.99
+        
+        const regularPrice = dp?.originalPrice || ticket.price;  // Always $99.99
+
+
+VISUAL LOGIC:
+
+    CASE 1: Early Bird Active (sold=15, earlyBirdQuantity=20)
+        earlyBirdRemaining = 20 - 15 = 5
+        isEarlyBirdActive = true
+        currentPrice = $49.99
+        
+        Display:
+        ┌────────────────────────────────────────────────────────────────┐
+        │ VIP                                    🐦 EARLY BIRD          │
+        │ VIP access with premium benefits       $49.99  ~~$99.99~~     │
+        │ Available: 35 / 50                                            │
+        │ ⚡ 5 early bird tickets left!                                 │
+        │                                        [Book Now]             │
+        └────────────────────────────────────────────────────────────────┘
+
+
+    CASE 2: Early Bird Exhausted (sold=25, earlyBirdQuantity=20)
+        earlyBirdRemaining = 20 - 25 = -5 → 0 (Math.max)
+        isEarlyBirdActive = false
+        currentPrice = $99.99 (originalPrice)
+        
+        Display:
+        ┌────────────────────────────────────────────────────────────────┐
+        │ VIP                                    $99.99                 │
+        │ VIP access with premium benefits                              │
+        │ Available: 25 / 50                                            │
+        │ Early bird sold out                                           │
+        │                                        [Book Now]             │
+        └────────────────────────────────────────────────────────────────┘
+
+
+    CASE 3: No Early Bird (dynamicPricing = null)
+        hasEarlyBird = false
+        currentPrice = ticket.price
+        
+        Display:
+        ┌────────────────────────────────────────────────────────────────┐
+        │ Regular                                FREE                   │
+        │ Standard entry ticket                                         │
+        │ Available: 350 / 500                                          │
+        │                                        [Book Now]             │
+        └────────────────────────────────────────────────────────────────┘
+
+
+FRONTEND CODE (EventDetailsPage.tsx):
+
+    return (
+        <Card className={`mb-3 ${isEarlyBirdActive ? 'border-warning' : ''}`}>
+            <Card.Body>
+                <div className="d-flex justify-content-between">
+                    <h6>{ticket.name}</h6>
+                    <div>
+                        {isEarlyBirdActive ? (
+                            <>
+                                <Badge bg="warning">🐦 EARLY BIRD</Badge>
+                                <strong className="text-success">{formatPrice(currentPrice)}</strong>
+                                <small className="text-decoration-line-through">
+                                    {formatPrice(regularPrice)}
+                                </small>
+                            </>
+                        ) : (
+                            <Badge bg={currentPrice === 0 ? 'success' : 'primary'}>
+                                {formatPrice(currentPrice)}
+                            </Badge>
+                        )}
+                    </div>
+                </div>
+                
+                <small>Available: {ticket.capacity - ticket.sold} / {ticket.capacity}</small>
+                
+                {isEarlyBirdActive && (
+                    <small className="text-warning">
+                        ⚡ {earlyBirdRemaining} early bird ticket(s) left!
+                    </small>
+                )}
+                
+                {hasEarlyBird && !isEarlyBirdActive && (
+                    <small className="text-muted">Early bird sold out</small>
+                )}
+            </Card.Body>
+        </Card>
+    );
+
+
+================================================================================
+PART 5: BOOKING WITH DYNAMIC PRICING (BACKEND LOGIC)
+================================================================================
+
+CRITICAL: The backend calculates the actual price during booking!
+
+BACKEND: attendee.controller.ts - bookTicket()
+
+    const booking = await AppDataSource.transaction(async (em) => {
+        // 1. Lock ticket type row (prevent race conditions)
+        const ticketType = await em.getRepository(TicketType)
+            .createQueryBuilder('ticketType')
+            .setLock('pessimistic_write')
+            .where('ticketType.id = :id', { id: ticketTypeId })
+            .getOne();
+        
+        // 2. Check availability
+        const available = ticketType.capacity - ticketType.sold;
+        if (available < quantity) throw new Error('Not enough tickets');
+        
+        // 3. CALCULATE EFFECTIVE PRICE (Early Bird Logic)
+        let effectivePrice = Number(ticketType.price);
+        
+        if (ticketType.dynamicPricing) {
+            const dp = ticketType.dynamicPricing;
+            
+            if (dp.type === 'early_bird') {
+                // How many early bird tickets are left?
+                const earlyBirdRemaining = dp.earlyBirdQuantity - ticketType.sold;
+                
+                if (earlyBirdRemaining <= 0) {
+                    // ============================================
+                    // CASE A: Early bird completely sold out
+                    //         Use regular price for all tickets
+                    // ============================================
+                    effectivePrice = Number(dp.originalPrice);
+                    
+                } else if (quantity > earlyBirdRemaining) {
+                    // ============================================
+                    // CASE B: Partial early bird
+                    //         Some tickets at early bird price,
+                    //         remaining at regular price
+                    // ============================================
+                    
+                    // Example: 5 early bird left, user wants 8
+                    // 5 tickets × $49.99 = $249.95
+                    // 3 tickets × $99.99 = $299.97
+                    // Total = $549.92
+                    
+                    const earlyBirdTotal = earlyBirdRemaining * Number(dp.earlyBirdPrice);
+                    const regularTotal = (quantity - earlyBirdRemaining) * Number(dp.originalPrice);
+                    const totalPrice = earlyBirdTotal + regularTotal;
+                    
+                    // Create booking with calculated price
+                    const booking = em.getRepository(Booking).create({
+                        userId, eventId, ticketTypeId, quantity,
+                        totalPrice,  // Mixed price!
+                        status: BookingStatus.CONFIRMED,
+                    });
+                    await em.save(booking);
+                    
+                    // Update sold count
+                    ticketType.sold += quantity;
+                    await em.save(ticketType);
+                    
+                    return booking;
+                    
+                } else {
+                    // ============================================
+                    // CASE C: All at early bird price
+                    //         Enough early bird tickets left
+                    // ============================================
+                    effectivePrice = Number(dp.earlyBirdPrice);
+                }
+            }
+        }
+        
+        // 4. Calculate total based on effective price
+        const totalPrice = effectivePrice * quantity;
+        
+        // 5. Create booking
+        const booking = em.getRepository(Booking).create({
+            userId, eventId, ticketTypeId, quantity,
+            totalPrice,
+            status: BookingStatus.CONFIRMED,
+        });
+        await em.save(booking);
+        
+        // 6. INCREMENT SOLD COUNT ← This is how we track progress!
+        ticketType.sold += quantity;
+        await em.save(ticketType);
+        
+        return booking;
+    });
+
+
+================================================================================
+PART 6: HOW SOLD COUNT TRACKS EARLY BIRD
+================================================================================
+
+THE KEY INSIGHT:
+    The `sold` column is the counter that determines early bird status!
+    
+    Early Bird Condition: sold < earlyBirdQuantity
+    Regular Price Condition: sold >= earlyBirdQuantity
+
+
+TIMELINE EXAMPLE:
+
+    Event Created:
+        capacity: 50, sold: 0
+        earlyBirdQuantity: 20
+        Current price: $49.99 (early bird active, 20 remaining)
+    
+    User A books 5 tickets:
+        sold: 0 → 5
+        Early bird remaining: 20 - 5 = 15
+        Price charged: $49.99 × 5 = $249.95
+    
+    User B books 10 tickets:
+        sold: 5 → 15
+        Early bird remaining: 20 - 15 = 5
+        Price charged: $49.99 × 10 = $499.90
+    
+    User C books 3 tickets:
+        sold: 15 → 18
+        Early bird remaining: 20 - 18 = 2
+        Price charged: $49.99 × 3 = $149.97
+    
+    User D books 5 tickets:  ← PARTIAL EARLY BIRD!
+        sold: 18
+        Early bird remaining: 20 - 18 = 2
+        User wants 5, but only 2 early bird left
+        
+        Calculation:
+            2 tickets × $49.99 = $99.98  (early bird)
+            3 tickets × $99.99 = $299.97 (regular)
+            Total = $399.95
+        
+        sold: 18 → 23
+    
+    User E books 2 tickets:
+        sold: 23
+        Early bird remaining: 20 - 23 = -3 → 0
+        isEarlyBirdActive: false
+        Price charged: $99.99 × 2 = $199.98 (regular price)
+        sold: 23 → 25
+
+
+NO SEPARATE COUNTER NEEDED:
+    We don't track "early bird sold" separately.
+    We just check: sold < earlyBirdQuantity
+    
+    This is elegant because:
+    - Simple single counter
+    - No sync issues between counters
+    - Early bird automatically "activates" when sold < threshold
+    - Early bird automatically "deactivates" when sold >= threshold
+
+
+================================================================================
+PART 7: CANCELLATION & REFUND
+================================================================================
+
+When a booking is cancelled, we restore the sold count:
+
+BACKEND: attendee.controller.ts - cancelBooking()
+
+    // Cancel the booking
+    booking.status = BookingStatus.CANCELLED;
+    await em.save(booking);
+    
+    // RESTORE ticket capacity
+    ticketType.sold -= booking.quantity;
+    await em.save(ticketType);
+
+
+EFFECT ON EARLY BIRD:
+
+    Before cancellation:
+        sold: 22, earlyBirdQuantity: 20
+        Early bird status: INACTIVE (22 >= 20)
+    
+    User cancels 5 tickets:
+        sold: 22 → 17
+        Early bird remaining: 20 - 17 = 3
+        Early bird status: ACTIVE AGAIN!
+    
+    The UI will now show early bird pricing again because sold < earlyBirdQuantity
+
+
+================================================================================
+PART 8: COMPLETE DATA FLOW DIAGRAM
+================================================================================
+
+ORGANIZER CREATES EVENT:
+    ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+    │ CreateEvent │      │   API       │      │  Database   │
+    │ Form        │ ──→  │   POST      │ ──→  │  INSERT     │
+    │             │      │   /events   │      │  ticket_type│
+    └─────────────┘      └─────────────┘      └─────────────┘
+          │
+          ▼
+    earlyBird.enabled = true
+    vipTicket.price = 99.99
+    earlyBird.price = 49.99
+    earlyBird.quantity = 20
+          │
+          ▼
+    Build: dynamicPricing = {
+        type: "early_bird",
+        originalPrice: 99.99,
+        earlyBirdQuantity: 20,
+        earlyBirdPrice: 49.99
+    }
+
+
+ATTENDEE VIEWS EVENT:
+    ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+    │   Frontend  │ ←──  │   API       │ ←──  │  Database   │
+    │   Display   │      │   GET       │      │  SELECT     │
+    │   Logic     │      │   /events/id│      │  ticket_type│
+    └─────────────┘      └─────────────┘      └─────────────┘
+          │
+          ▼
+    sold = 15, earlyBirdQuantity = 20
+    earlyBirdRemaining = 20 - 15 = 5
+    isEarlyBirdActive = true
+    currentPrice = $49.99
+          │
+          ▼
+    Show: "🐦 EARLY BIRD $49.99  ~~$99.99~~  5 left!"
+
+
+ATTENDEE BOOKS TICKET:
+    ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+    │   Click     │ ──→  │   API       │ ──→  │  Transaction│
+    │   Book Now  │      │   POST      │      │  + Lock     │
+    │             │      │   /bookings │      │  + Calculate│
+    └─────────────┘      └─────────────┘      └─────────────┘
+          │                                          │
+          │                                          ▼
+          │                                    Check: sold < earlyBirdQty?
+          │                                    YES → price = earlyBirdPrice
+          │                                    NO → price = originalPrice
+          │                                          │
+          │                                          ▼
+          │                                    INSERT booking
+          │                                    UPDATE sold += quantity
+          │                                          │
+    ┌─────────────┐                                  │
+    │  Redirect   │ ←────────────────────────────────┘
+    │  to My      │
+    │  Bookings   │
+    └─────────────┘
+
+
+DISPLAY UPDATES AUTOMATICALLY:
+    Next request for event → sold has increased → 
+    Frontend recalculates → Shows updated early bird status
+
+
+================================================================================
+SUMMARY
+================================================================================
+
+1. DATABASE:
+   - dynamicPricing JSONB stores early bird config
+   - sold counter tracks tickets sold
+   - No separate early bird counter needed
+
+2. TICKET CREATION:
+   - Frontend builds dynamicPricing object
+   - price field set to early bird price initially
+   - dynamicPricing stores originalPrice for later
+
+3. DISPLAY LOGIC (Frontend):
+   - Check: sold < earlyBirdQuantity?
+   - YES: Show early bird badge, discounted price, remaining count
+   - NO: Show regular price, "early bird sold out"
+
+4. BOOKING LOGIC (Backend):
+   - Lock ticket row (prevent race conditions)
+   - Calculate effective price based on sold count
+   - Handle partial early bird (some at discount, rest at regular)
+   - Increment sold count
+   - This increment automatically updates early bird status
+
+5. CANCELLATION:
+   - Decrement sold count
+   - Early bird can become active again if sold drops below threshold
+
+================================================================================

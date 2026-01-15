@@ -1,0 +1,582 @@
+================================================================================
+          FULL-STACK FLOW #5: BOOKINGS & PAYMENT
+          End-to-End: Select Tickets → Payment → Confirmation
+================================================================================
+
+This document explains the complete booking and payment flow.
+
+================================================================================
+PART 1: EVENT DETAILS PAGE (Before Booking)
+================================================================================
+
+PAGE: /events/:id (EventDetailsPage.tsx)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Concert 2024                                                         🚩    │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │                                                                         │ │
+│  │                    [EVENT BANNER IMAGE]                                │ │
+│  │                                                                         │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  📅 July 15, 2024 at 6:00 PM                                                │
+│  📍 Central Park, New York                                                   │
+│  🏷️ Category: Music | 👤 Organized by: John Smith                           │
+│                                                                              │
+│  DESCRIPTION                                                                 │
+│  An amazing summer concert featuring local bands...                          │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  SELECT TICKETS                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ 🎫 Regular                                  FREE                       │ │
+│  │    Standard entry ticket                    350 available              │ │
+│  │                                    Qty: [-] 0 [+]                      │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ ⭐ VIP (Early Bird!)                        $49.99                     │ │
+│  │    VIP access with premium benefits         15 left at this price     │ │
+│  │    🐦 First 10 at $49.99, then $99.99                                  │ │
+│  │                                    Qty: [-] 0 [+]                      │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│                               [BOOK NOW - $0.00]                             │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+FRONTEND STATE (EventDetailsPage.tsx):
+    const [event, setEvent] = useState(null);
+    const [selectedTickets, setSelectedTickets] = useState({});
+    // selectedTickets = { 'ticket-id-1': 2, 'ticket-id-2': 0 }
+    
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+
+TICKET SELECTION:
+    const incrementQuantity = (ticketId) => {
+        setSelectedTickets(prev => ({
+            ...prev,
+            [ticketId]: (prev[ticketId] || 0) + 1
+        }));
+    };
+    
+    const decrementQuantity = (ticketId) => {
+        setSelectedTickets(prev => ({
+            ...prev,
+            [ticketId]: Math.max((prev[ticketId] || 0) - 1, 0)
+        }));
+    };
+
+
+CALCULATING TOTALS:
+    const getTotalPrice = () => {
+        return Object.entries(selectedTickets).reduce((total, [ticketId, qty]) => {
+            const ticket = event.ticketTypes.find(t => t.id === ticketId);
+            return total + (ticket.price * qty);
+        }, 0);
+    };
+
+
+================================================================================
+PART 2: PAYMENT MODAL
+================================================================================
+
+When user clicks "Book Now":
+
+COMPONENT: PaymentModal.tsx
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  ⚡ Razorpay                                                           ✕    │
+├───────────────────────────────────┬──────────────────────────────────────────┤
+│  ORDER SUMMARY                    │  CHOOSE PAYMENT METHOD                   │
+│  ┌─────────────────────────────┐  │  ┌──────────────────────────────────────┐│
+│  │ Concert 2024                │  │  │ 📱 UPI                      ◉        ││
+│  │ VIP  ×2                     │  │  │     Pay using any UPI app            ││
+│  └─────────────────────────────┘  │  ├──────────────────────────────────────┤│
+│                                   │  │ 💳 Credit/Debit Card        ○        ││
+│  Ticket Price   $49.99 × 2        │  │     Visa, Mastercard, Rupay          ││
+│  Subtotal       $99.98            │  ├──────────────────────────────────────┤│
+│  Convenience Fee $1.00            │  │ 🏦 Net Banking              ○        ││
+│  ─────────────────────            │  │     All major banks                  ││
+│  Total Amount   $100.98           │  ├──────────────────────────────────────┤│
+│                                   │  │ 👛 Wallets                  ○        ││
+│                                   │  │     Paytm, PhonePe, etc.             ││
+│                                   │  └──────────────────────────────────────┘│
+│                                   │                                          │
+│                                   │  Enter UPI ID:                           │
+│                                   │  [yourname@upi________________]          │
+├───────────────────────────────────┴──────────────────────────────────────────┤
+│  🔒 Secured by Razorpay                              [Pay $100.98]          │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+PAYMENT MODAL PROPS:
+    <PaymentModal
+        show={showPaymentModal}
+        onHide={() => setShowPaymentModal(false)}
+        ticketName="VIP"
+        ticketPrice={49.99}
+        quantity={2}
+        eventName="Concert 2024"
+        onPaymentComplete={handlePaymentComplete}
+        loading={bookingLoading}
+    />
+
+
+PAYMENT MODAL STATE (PaymentModal.tsx):
+    const [selectedMethod, setSelectedMethod] = useState(null);
+    // 'upi' | 'card' | 'netbanking' | 'wallet'
+    
+    const [upiId, setUpiId] = useState('');
+    const [cardNumber, setCardNumber] = useState('');
+    const [selectedBank, setSelectedBank] = useState('');
+    const [selectedWallet, setSelectedWallet] = useState('');
+
+
+VALIDATION:
+    const canProceed = () => {
+        if (!selectedMethod) return false;
+        switch (selectedMethod) {
+            case 'upi': return upiId.includes('@');
+            case 'card': return cardNumber.length >= 16;
+            case 'netbanking': return selectedBank !== '';
+            case 'wallet': return selectedWallet !== '';
+            default: return false;
+        }
+    };
+
+
+================================================================================
+PART 3: HANDLING PAYMENT COMPLETION
+================================================================================
+
+When user clicks "Pay":
+
+FRONTEND (EventDetailsPage.tsx):
+    const handlePaymentComplete = async () => {
+        // For each selected ticket type, make a booking
+        for (const [ticketId, qty] of Object.entries(selectedTickets)) {
+            if (qty > 0) {
+                await attendeeApi.bookTicket({
+                    eventId: event.id,
+                    ticketTypeId: ticketId,
+                    quantity: qty,
+                });
+            }
+        }
+        
+        // Close modal and show success
+        setShowPaymentModal(false);
+        
+        // Redirect to bookings page
+        navigate('/attendee/bookings');
+    };
+
+
+NOTE: In this demo, payment is simulated. The modal just confirms intent,
+then the API is called. In production, you'd integrate actual payment gateway.
+
+
+================================================================================
+PART 4: BACKEND BOOKING FLOW
+================================================================================
+
+API CALL:
+    POST /api/attendee/bookings
+    Body: {
+        eventId: "event-uuid",
+        ticketTypeId: "ticket-type-uuid",
+        quantity: 2
+    }
+
+
+BACKEND (attendee.controller.ts - bookTicket):
+
+    bookTicket = asyncHandler(async (req, res) => {
+        const userId = req.user.userId;
+        const { eventId, ticketTypeId, quantity } = req.body;
+        
+        // Validation
+        if (!eventId || !ticketTypeId || !quantity) {
+            throw new ValidationError('Event ID, Ticket Type ID, and quantity are required');
+        }
+        if (quantity < 1) {
+            throw new ValidationError('Quantity must be at least 1');
+        }
+
+
+STEP 1: DATABASE TRANSACTION (Prevents Race Conditions)
+        const booking = await AppDataSource.transaction(async (em) => {
+
+
+STEP 2: LOCK TICKET TYPE ROW (Prevents Overbooking)
+            const ticketType = await em.getRepository(TicketType)
+                .createQueryBuilder('ticketType')
+                .setLock('pessimistic_write')   // LOCK this row!
+                .where('ticketType.id = :id', { id: ticketTypeId })
+                .getOne();
+            
+            if (!ticketType) {
+                throw new NotFoundError('Ticket type not found');
+            }
+            
+            // SQL: SELECT * FROM ticket_types WHERE id = ? FOR UPDATE;
+
+
+STEP 3: VALIDATE EVENT
+            const event = await em.getRepository(Event)
+                .findOne({ where: { id: eventId } });
+            
+            if (!event) throw new NotFoundError('Event not found');
+            if (!event.isPublished) {
+                throw new ValidationError('Event not available for booking');
+            }
+            if (new Date(event.startDateTime) < new Date()) {
+                throw new ValidationError('Cannot book tickets for past events');
+            }
+
+
+STEP 4: CHECK AVAILABILITY
+            const available = ticketType.capacity - ticketType.sold;
+            if (available < quantity) {
+                throw new ValidationError(
+                    `Only ${available} tickets available. Cannot book ${quantity} tickets.`
+                );
+            }
+
+
+STEP 5: HANDLE DYNAMIC PRICING (Early Bird)
+            let effectivePrice = Number(ticketType.price);
+            
+            if (ticketType.dynamicPricing) {
+                const dp = ticketType.dynamicPricing;
+                if (dp.type === 'early_bird') {
+                    const earlyBirdRemaining = dp.earlyBirdQuantity - ticketType.sold;
+                    
+                    if (earlyBirdRemaining <= 0) {
+                        // Early bird sold out, use regular price
+                        effectivePrice = Number(dp.originalPrice);
+                    } else if (quantity > earlyBirdRemaining) {
+                        // Split: some early bird, some regular
+                        const earlyBirdTotal = earlyBirdRemaining * dp.earlyBirdPrice;
+                        const regularTotal = (quantity - earlyBirdRemaining) * dp.originalPrice;
+                        totalPrice = earlyBirdTotal + regularTotal;
+                    } else {
+                        // All at early bird price
+                        effectivePrice = Number(dp.earlyBirdPrice);
+                    }
+                }
+            }
+            
+            const totalPrice = effectivePrice * quantity;
+
+
+STEP 6: CREATE BOOKING
+            const newBooking = em.getRepository(Booking).create({
+                userId,
+                eventId,
+                ticketTypeId,
+                quantity,
+                totalPrice,
+                status: BookingStatus.CONFIRMED,
+            });
+            
+            await em.getRepository(Booking).save(newBooking);
+            
+            // SQL: INSERT INTO bookings (id, userId, eventId, ticketTypeId, 
+            //      quantity, totalPrice, status, bookingReference, ...) 
+            //      VALUES (...);
+
+
+STEP 7: UPDATE SOLD COUNT
+            ticketType.sold += quantity;
+            await em.getRepository(TicketType).save(ticketType);
+            
+            // SQL: UPDATE ticket_types SET sold = sold + 2 WHERE id = ?;
+
+
+STEP 8: RETURN BOOKING
+            return newBooking;
+        });
+        
+        // Transaction complete - row lock released
+        
+        // Invalidate cache
+        await cacheService.del(CacheKeys.EVENT_SINGLE + eventId);
+        
+        return sendSuccess(res, { booking }, 'Ticket booked successfully', 201);
+    });
+
+
+================================================================================
+PART 5: BOOKING ENTITY (Database Model)
+================================================================================
+
+FILE: /backend/src/entities/Booking.entity.ts
+
+    @Entity('bookings')
+    export class Booking {
+        @PrimaryGeneratedColumn('uuid')
+        id: string;
+        
+        @Column()
+        userId: string;
+        
+        @Column()
+        eventId: string;
+        
+        @Column()
+        ticketTypeId: string;
+        
+        @Column()
+        quantity: number;
+        
+        @Column('decimal', { precision: 10, scale: 2 })
+        totalPrice: number;
+        
+        @Column({
+            type: 'enum',
+            enum: BookingStatus,
+            default: BookingStatus.CONFIRMED,
+        })
+        status: BookingStatus;
+        
+        @Column({ unique: true })
+        bookingReference: string;  // Auto-generated: "BK-ABC123"
+        
+        @CreateDateColumn()
+        bookedAt: Date;
+        
+        @Column({ nullable: true })
+        attendedAt: Date;
+        
+        @Column({ nullable: true })
+        cancelledAt: Date;
+        
+        // Relations
+        @ManyToOne(() => User)
+        user: User;
+        
+        @ManyToOne(() => Event)
+        event: Event;
+        
+        @ManyToOne(() => TicketType)
+        ticketType: TicketType;
+    }
+
+
+BOOKING STATUSES:
+    enum BookingStatus {
+        CONFIRMED = 'confirmed',   // Ticket booked
+        ATTENDED = 'attended',     // User attended the event
+        CANCELLED = 'cancelled',   // Booking was cancelled
+    }
+
+
+================================================================================
+PART 6: MY BOOKINGS PAGE
+================================================================================
+
+PAGE: /attendee/bookings (MyBookingsPage.tsx)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  My Bookings                                                                  │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  UPCOMING                                                                     │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ Concert 2024                              Booking Ref: BK-X7Y9Z2       │ │
+│  │ 📅 July 15, 2024 at 6:00 PM                                            │ │
+│  │ 🎫 VIP × 2                                                             │ │
+│  │ 💰 $99.98                                Status: ✓ Confirmed           │ │
+│  │                        [View Details] [Cancel Booking]                  │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  PAST                                                                        │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ Workshop 2024                             Booking Ref: BK-A1B2C3       │ │
+│  │ 📅 Jan 10, 2024                                                        │ │
+│  │ 🎫 Regular × 1                            Status: ✓ Attended           │ │
+│  │                                                     [Write Review]      │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+API CALL:
+    GET /api/attendee/bookings
+
+
+BACKEND (attendee.controller.ts - getMyBookings):
+    getMyBookings = asyncHandler(async (req, res) => {
+        const userId = req.user.userId;
+        
+        const bookings = await this.bookingRepository.find({
+            where: { userId },
+            relations: ['event', 'event.category', 'ticketType'],
+            order: { createdAt: 'DESC' },
+        });
+        
+        return sendSuccess(res, { bookings });
+    });
+
+
+================================================================================
+PART 7: CANCEL BOOKING
+================================================================================
+
+API CALL:
+    DELETE /api/attendee/bookings/:id
+
+
+BACKEND (attendee.controller.ts - cancelBooking):
+    cancelBooking = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const userId = req.user.userId;
+        
+        const result = await AppDataSource.transaction(async (em) => {
+            // Get booking
+            const booking = await em.getRepository(Booking)
+                .findOne({
+                    where: { id, userId },
+                    relations: ['event', 'ticketType'],
+                });
+            
+            if (!booking) throw new NotFoundError('Booking not found');
+            
+            if (booking.status === BookingStatus.CANCELLED) {
+                throw new ValidationError('Booking is already cancelled');
+            }
+            
+            // Check if event has started
+            if (new Date(booking.event.startDateTime) < new Date()) {
+                throw new ValidationError('Cannot cancel booking for started events');
+            }
+            
+            // Lock ticket type for update
+            const ticketType = await em.getRepository(TicketType)
+                .createQueryBuilder('ticketType')
+                .setLock('pessimistic_write')
+                .where('ticketType.id = :id', { id: booking.ticketTypeId })
+                .getOne();
+            
+            // Update booking status
+            booking.status = BookingStatus.CANCELLED;
+            booking.cancelledAt = new Date();
+            await em.getRepository(Booking).save(booking);
+            
+            // Restore ticket capacity
+            ticketType.sold -= booking.quantity;
+            await em.getRepository(TicketType).save(ticketType);
+            
+            // Check waitlist for notifications
+            const waitlistUsers = await em.getRepository(Waitlist)
+                .find({
+                    where: {
+                        eventId: booking.eventId,
+                        ticketTypeId: booking.ticketTypeId,
+                        status: WaitlistStatus.WAITING,
+                    },
+                    order: { position: 'ASC' },
+                    take: booking.quantity,
+                });
+            
+            return {
+                message: 'Booking cancelled successfully',
+                waitlistNotified: waitlistUsers.length,
+            };
+        });
+        
+        return sendSuccess(res, result);
+    });
+
+
+================================================================================
+PART 8: MARK ATTENDANCE
+================================================================================
+
+When event has started, attendee can mark attendance:
+
+API CALL:
+    POST /api/attendee/bookings/:id/attend
+
+
+BACKEND (attendee.controller.ts - markAttendance):
+    markAttendance = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const userId = req.user.userId;
+        
+        const booking = await this.bookingRepository.findOne({
+            where: { id, userId },
+            relations: ['event'],
+        });
+        
+        if (!booking) throw new NotFoundError('Booking not found');
+        
+        if (booking.status === BookingStatus.CANCELLED) {
+            throw new ValidationError('Cannot mark attendance for cancelled booking');
+        }
+        
+        // Check if event has started
+        if (new Date(booking.event.startDateTime) > new Date()) {
+            throw new ValidationError('Event has not started yet');
+        }
+        
+        booking.status = BookingStatus.ATTENDED;
+        booking.attendedAt = new Date();
+        await this.bookingRepository.save(booking);
+        
+        return sendSuccess(res, { message: 'Attendance marked successfully' });
+    });
+
+
+WHY MARK ATTENDANCE?
+    - Required to write a review
+    - Proof of participation
+    - Can be used for analytics
+
+
+================================================================================
+PART 9: ALL BOOKING API ROUTES
+================================================================================
+
+FILE: /backend/src/routes/attendee.routes.ts
+
+    // All routes require attendee authentication
+    router.use(authenticate, authorize([UserRole.ATTENDEE]));
+    
+    // Bookings
+    POST   /attendee/bookings                  → bookTicket
+    GET    /attendee/bookings                  → getMyBookings
+    GET    /attendee/bookings/:id              → getBookingById
+    DELETE /attendee/bookings/:id              → cancelBooking
+    POST   /attendee/bookings/:id/attend       → markAttendance
+
+
+================================================================================
+SUMMARY: BOOKING FLOW
+================================================================================
+
+USER JOURNEY:
+    1. Browse Events → Select Event → View Details
+    2. Select Ticket Types & Quantities
+    3. Click "Book Now" → Payment Modal opens
+    4. Select Payment Method → Enter Details
+    5. Click "Pay" → Frontend calls booking API
+    6. Backend: Transaction → Lock → Validate → Create → Update sold
+    7. Confirmation shown → Redirect to My Bookings
+    
+CANCEL JOURNEY:
+    1. Go to My Bookings
+    2. Click Cancel on a booking
+    3. Backend: Transaction → Lock → Update status → Restore capacity
+    4. Waitlist users notified
+    
+ATTENDANCE JOURNEY:
+    1. Event day arrives
+    2. Go to My Bookings
+    3. Click "Mark Attendance" (only available after event starts)
+    4. Status changes to "Attended"
+    5. Now can write a review
+
+================================================================================

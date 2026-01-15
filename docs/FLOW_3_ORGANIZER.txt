@@ -1,0 +1,462 @@
+================================================================================
+          FULL-STACK FLOW #3: ORGANIZER FEATURES
+          End-to-End: Create Event, Manage Events, View Attendees
+================================================================================
+
+This document explains the complete organizer flow from dashboard to event management.
+
+================================================================================
+PART 1: ORGANIZER REGISTRATION & APPROVAL
+================================================================================
+
+SPECIAL FLOW FOR ORGANIZERS:
+    1. User registers with role='organizer'
+    2. Account created with status='pending'
+    3. Cannot access organizer features until approved
+    4. Admin approves → status='active'
+    5. Now can access organizer dashboard
+
+
+REGISTRATION (RegisterPage.tsx):
+    if (formData.role === 'organizer') {
+        setSuccess('Registration successful! Your account is pending admin approval.');
+        setTimeout(() => navigate('/login'), 3000);
+    }
+
+
+ROUTE PROTECTION (organizer.routes.ts):
+    router.use(authenticate, authorize([UserRole.ORGANIZER]), checkOrganizerStatus);
+    
+    checkOrganizerStatus middleware:
+    - Checks if user.status === 'active'
+    - If 'pending', returns 403 Forbidden
+
+
+================================================================================
+PART 2: ORGANIZER DASHBOARD
+================================================================================
+
+PAGE: /organizer/dashboard (OrganizerDashboard.tsx)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Welcome back, John!                                                         │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  STATS CARDS                                                                  │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                       │
+│  │     5        │  │     127      │  │      3       │                       │
+│  │ Total Events │  │ Total Bookings│  │ Upcoming     │                       │
+│  └──────────────┘  └──────────────┘  └──────────────┘                       │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  MY EVENTS                                        [+ Create New Event]       │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ Concert 2024        | Music  | Mar 15, 2024 | 150/500 | [Manage] [Edit]│ │
+│  │ Workshop Session    | Tech   | Mar 20, 2024 | 25/50   | [Manage] [Edit]│ │
+│  │ Art Exhibition      | Art    | Apr 01, 2024 | 80/100  | [Manage] [Edit]│ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+FRONTEND FLOW:
+    1. Component mounts
+    2. useEffect calls organizerApi.getDashboard()
+    3. GET /api/organizer/dashboard (with auth token)
+    4. Backend returns stats + events list
+    5. UI renders stats cards and event table
+
+
+BACKEND (organizer.controller.ts - getDashboard):
+    const organizerId = req.user.userId;
+    
+    const events = await this.eventRepository.find({
+        where: { organizerId },
+        relations: ['category', 'ticketTypes', 'bookings', 'reviews'],
+        order: { createdAt: 'DESC' },
+    });
+    
+    const totalEvents = events.length;
+    const totalBookings = events.reduce((sum, e) => sum + e.bookings.length, 0);
+    const upcomingEvents = events.filter(e => new Date(e.startDateTime) > new Date()).length;
+    
+    return sendSuccess(res, { stats: {...}, events });
+
+
+================================================================================
+PART 3: CREATE EVENT FLOW
+================================================================================
+
+PAGE: /organizer/events/create (CreateEventPage.tsx)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Create New Event                                                             │
+├────────────────────────────────────────────────┬─────────────────────────────┤
+│  EVENT DETAILS                                 │  TICKET CONFIGURATION        │
+│  ┌──────────────────────────────────────────┐  │  ┌─────────────────────────┐│
+│  │ Title: [___________________________]    │  │  │ ☑ Regular Ticket (FREE) ││
+│  │                                          │  │  │   Capacity: [100]       ││
+│  │ Description:                             │  │  │                         ││
+│  │ [_________________________________]      │  │  │ ☐ VIP Ticket ($99)      ││
+│  │ [_________________________________]      │  │  │   Capacity: [20]        ││
+│  │                                          │  │  │   Price: [$99.99]       ││
+│  │ Start: [2024-07-15] [18:00]              │  │  │                         ││
+│  │ End:   [2024-07-15] [22:00]              │  │  │   ☐ Early Bird          ││
+│  │                                          │  │  │   First [10] at [$49.99]││
+│  │ Location: [Central Park, NYC_____]       │  │  └─────────────────────────┘│
+│  │                                          │  │                             │
+│  │ Category: [Music        ▼]               │  │  Total Capacity: 120 seats │
+│  │                                          │  │                             │
+│  │ ☑ Publish immediately                    │  │  [CREATE EVENT]             │
+│  └──────────────────────────────────────────┘  │  [Cancel]                   │
+├────────────────────────────────────────────────┴─────────────────────────────┤
+│  MEDIA (Optional)                                                             │
+│  Banner Image URL: [____________________________]                             │
+│  Video URL: [_______________________________]                                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+FRONTEND STATE:
+    const [formData, setFormData] = useState({
+        title: '',
+        description: '',
+        startDateTime: '',
+        endDateTime: '',
+        location: '',
+        categoryId: '',
+        bannerImage: '',
+    });
+    
+    const [regularTicket, setRegularTicket] = useState({
+        enabled: true,
+        capacity: 100,
+        price: 0,
+    });
+    
+    const [vipTicket, setVipTicket] = useState({
+        enabled: false,
+        capacity: 20,
+        price: 99.99,
+    });
+    
+    const [earlyBird, setEarlyBird] = useState({
+        enabled: false,
+        quantity: 10,
+        price: 49.99,
+    });
+
+
+FORM SUBMISSION (handleSubmit):
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        
+        // Validation
+        if (!regularTicket.enabled && !vipTicket.enabled) {
+            setError('Please enable at least one ticket type');
+            return;
+        }
+        
+        // Build ticket types array
+        const ticketTypes = [];
+        
+        if (regularTicket.enabled) {
+            ticketTypes.push({
+                name: 'Regular',
+                description: 'Standard entry',
+                price: 0,
+                capacity: regularTicket.capacity,
+            });
+        }
+        
+        if (vipTicket.enabled) {
+            const vipData = {
+                name: 'VIP',
+                price: earlyBird.enabled ? earlyBird.price : vipTicket.price,
+                capacity: vipTicket.capacity,
+            };
+            
+            if (earlyBird.enabled) {
+                vipData.dynamicPricing = {
+                    type: 'early_bird',
+                    originalPrice: vipTicket.price,
+                    earlyBirdQuantity: earlyBird.quantity,
+                    earlyBirdPrice: earlyBird.price,
+                };
+            }
+            ticketTypes.push(vipData);
+        }
+        
+        await organizerApi.createEvent({
+            ...formData,
+            capacity: totalCapacity,
+            ticketTypes,
+        });
+        
+        navigate('/organizer/dashboard');
+    };
+
+
+API CALL:
+    POST /api/organizer/events
+    Body: {
+        title: "Concert 2024",
+        description: "...",
+        startDateTime: "2024-07-15T18:00:00",
+        endDateTime: "2024-07-15T22:00:00",
+        location: "Central Park, NYC",
+        categoryId: "uuid",
+        capacity: 120,
+        isPublished: true,
+        ticketTypes: [
+            { name: "Regular", price: 0, capacity: 100 },
+            { name: "VIP", price: 49.99, capacity: 20, dynamicPricing: {...} }
+        ]
+    }
+
+
+BACKEND (organizer.controller.ts - createEvent):
+    createEvent = asyncHandler(async (req, res) => {
+        const organizerId = req.user.userId;
+        const { ticketTypes: ticketTypesData, ...eventData } = req.body;
+        
+        // Validate category exists
+        const category = await this.categoryRepository.findOne({
+            where: { id: eventData.categoryId },
+        });
+        if (!category) throw new NotFoundError('Category not found');
+        
+        // Validate dates
+        const startDate = new Date(eventData.startDateTime);
+        const endDate = new Date(eventData.endDateTime);
+        if (endDate <= startDate) {
+            throw new ValidationError('End date must be after start date');
+        }
+        
+        // Create event
+        const newEvent = await this.eventRepository.save(
+            this.eventRepository.create({
+                ...eventData,
+                organizerId,
+            })
+        );
+        
+        // Create ticket types
+        for (const ticketData of ticketTypesData) {
+            await this.ticketTypeRepository.save(
+                this.ticketTypeRepository.create({
+                    eventId: newEvent.id,
+                    name: ticketData.name,
+                    price: ticketData.price || 0,
+                    capacity: ticketData.capacity,
+                    sold: 0,
+                    dynamicPricing: ticketData.dynamicPricing,
+                })
+            );
+        }
+        
+        // Invalidate cache
+        await cacheService.delByPattern(CacheKeys.EVENTS_LIST + '*');
+        
+        return sendSuccess(res, { event: createdEvent }, 'Event created', 201);
+    });
+
+
+DATABASE INSERTS:
+    1. INSERT INTO events (id, title, description, organizerId, categoryId, ...)
+    2. INSERT INTO ticket_types (id, eventId, name, price, capacity, ...)
+    3. INSERT INTO ticket_types (id, eventId, name, price, capacity, dynamicPricing, ...)
+
+
+================================================================================
+PART 4: MANAGE EVENT (VIEW ATTENDEES)
+================================================================================
+
+PAGE: /organizer/events/:id/manage (ManageEventPage.tsx)
+
+VISUAL LAYOUT:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  Concert 2024                                              [Edit] [Delete]   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  TABS: [Overview] [Attendees] [Reviews]                                      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  ATTENDEES LIST                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ Name          | Email              | Ticket    | Qty | Status         │ │
+│  ├────────────────────────────────────────────────────────────────────────┤ │
+│  │ John Doe      | john@email.com     | Regular   | 2   | ✓ Confirmed   │ │
+│  │ Jane Smith    | jane@email.com     | VIP       | 1   | ✓ Attended    │ │
+│  │ Bob Wilson    | bob@email.com      | Regular   | 4   | ✗ Cancelled   │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  Total Attendees: 127   |   Capacity Used: 150/500                          │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+API CALL:
+    GET /api/organizer/events/:id/bookings
+
+
+BACKEND (organizer.controller.ts - getEventAttendees):
+    getEventAttendees = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const organizerId = req.user.userId;
+        
+        // Verify ownership
+        const event = await this.eventRepository.findOne({
+            where: { id, organizerId },
+            relations: ['bookings', 'bookings.user', 'bookings.ticketType'],
+        });
+        
+        if (!event) {
+            throw new NotFoundError('Event not found or no permission');
+        }
+        
+        // Format attendee list
+        const attendees = event.bookings.map((booking) => ({
+            id: booking.id,
+            bookingReference: booking.bookingReference,
+            user: {
+                id: booking.user.id,
+                firstName: booking.user.firstName,
+                lastName: booking.user.lastName,
+                email: booking.user.email,
+            },
+            ticketType: booking.ticketType.name,
+            quantity: booking.quantity,
+            status: booking.status,
+            bookedAt: booking.bookedAt,
+        }));
+        
+        return sendSuccess(res, { attendees });
+    });
+
+
+================================================================================
+PART 5: EDIT & DELETE EVENT
+================================================================================
+
+EDIT EVENT (PUT /api/organizer/events/:id):
+    updateEvent = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const organizerId = req.user.userId;
+        
+        // Verify ownership
+        const event = await this.eventRepository.findOne({
+            where: { id, organizerId },
+        });
+        
+        if (!event) throw new NotFoundError('Event not found or no permission');
+        
+        // Update fields
+        Object.assign(event, req.body);
+        await this.eventRepository.save(event);
+        
+        // Invalidate cache
+        await cacheService.del(CacheKeys.EVENT_SINGLE + id);
+        await cacheService.delByPattern(CacheKeys.EVENTS_LIST + '*');
+        
+        return sendSuccess(res, { event: updatedEvent });
+    });
+
+
+DELETE EVENT (DELETE /api/organizer/events/:id):
+    deleteEvent = asyncHandler(async (req, res) => {
+        const { id } = req.params;
+        const organizerId = req.user.userId;
+        
+        const event = await this.eventRepository.findOne({
+            where: { id, organizerId },
+            relations: ['ticketTypes', 'bookings'],
+        });
+        
+        if (!event) throw new NotFoundError('Event not found');
+        
+        // Delete in transaction (cascading)
+        await AppDataSource.transaction(async (manager) => {
+            // Delete bookings first
+            if (event.bookings.length > 0) {
+                await manager.remove(event.bookings);
+            }
+            // Delete ticket types
+            if (event.ticketTypes.length > 0) {
+                await manager.remove(event.ticketTypes);
+            }
+            // Delete event
+            await manager.remove(event);
+        });
+        
+        // Invalidate cache
+        await cacheService.del(CacheKeys.EVENT_SINGLE + id);
+        await cacheService.delByPattern(CacheKeys.EVENTS_LIST + '*');
+        
+        return sendSuccess(res, { message: 'Event deleted' });
+    });
+
+
+================================================================================
+PART 6: ALL ORGANIZER API ROUTES
+================================================================================
+
+FILE: /backend/src/routes/organizer.routes.ts
+
+    router.use(authenticate, authorize([UserRole.ORGANIZER]), checkOrganizerStatus);
+    
+    // Dashboard
+    GET  /organizer/dashboard                  → getDashboard
+    
+    // Events CRUD
+    GET  /organizer/events                     → getMyEvents
+    POST /organizer/events                     → createEvent
+    GET  /organizer/events/:id                 → getEventById
+    PUT  /organizer/events/:id                 → updateEvent
+    DELETE /organizer/events/:id               → deleteEvent
+    
+    // Attendees
+    GET  /organizer/events/:id/bookings        → getEventAttendees
+    
+    // Ticket Types
+    POST /organizer/events/:eventId/ticket-types           → createTicketType
+    PUT  /organizer/events/:eventId/ticket-types/:typeId   → updateTicketType
+    DELETE /organizer/events/:eventId/ticket-types/:typeId → deleteTicketType
+
+
+================================================================================
+SUMMARY: ORGANIZER FLOW
+================================================================================
+
+REGISTRATION:
+    Register → Pending → Admin Approves → Active
+
+DASHBOARD:
+    Login → /organizer/dashboard → See stats + events list
+
+CREATE EVENT:
+    Dashboard → Create Event → Fill form → Configure tickets → Submit
+         ↓
+    POST /api/organizer/events
+         ↓
+    Validate category + dates → Create event → Create ticket types → Cache invalidate
+         ↓
+    Redirect to dashboard
+
+MANAGE EVENT:
+    Dashboard → Manage button → See attendee list
+         ↓
+    GET /api/organizer/events/:id/bookings
+         ↓
+    Show bookings with user info
+
+EDIT EVENT:
+    Dashboard → Edit button → Update form → Submit
+         ↓
+    PUT /api/organizer/events/:id
+         ↓
+    Update database → Invalidate cache
+
+DELETE EVENT:
+    Manage page → Delete button → Confirm
+         ↓
+    DELETE /api/organizer/events/:id
+         ↓
+    Transaction: Delete bookings → tickets → event → Invalidate cache
+
+================================================================================

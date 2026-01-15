@@ -1,0 +1,337 @@
+================================================================================
+          BROWSE & VIEW EVENTS - COMPLETE FLOW
+          Public Access → Role-Based Booking → Backend Protection
+================================================================================
+
+================================================================================
+PART 1: PAGE ACCESS RULES
+================================================================================
+
+WHO CAN ACCESS WHAT:
+
+    /events (Browse Events Page)
+    ├── ✅ Everyone (public - no login required)
+    └── Shows: All published events
+
+    /events/:id (Event Details Page)
+    ├── ✅ Everyone (public - no login required)
+    └── Shows: Event details + tickets
+        BUT booking button behavior changes based on role
+
+
+================================================================================
+PART 2: BROWSE EVENTS PAGE (/events)
+================================================================================
+
+WHAT USER SEES:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  FILTERS SIDEBAR          │   EVENT CARDS GRID                               │
+│  ┌──────────────────────┐ │   ┌─────────────┐ ┌─────────────┐ ┌────────────┐│
+│  │ 🔍 Search            │ │   │ [Image]     │ │ [Image]     │ │ [Image]    ││
+│  │ [_______________]    │ │   │ Concert     │ │ Workshop    │ │ Art Show   ││
+│  │                      │ │   │ Jul 15      │ │ Jul 20      │ │ Aug 01     ││
+│  │ Category: [All ▼]    │ │   │ FREE        │ │ $49         │ │ $25        ││
+│  │                      │ │   └─────────────┘ └─────────────┘ └────────────┘│
+│  │ ☐ Free events only   │ │                                                 │
+│  │ ☐ Has availability   │ │   [1] [2] [3] ... [5]  (Pagination)             │
+│  └──────────────────────┘ │                                                 │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+FRONTEND DATA FLOW:
+    1. Component mounts
+    2. useEffect → eventsApi.getEvents(filters)
+    3. API: GET /api/events?page=1&limit=12
+    4. Response: { events: [...], pagination: {...} }
+    5. setEvents(response.data.events)
+    6. UI renders EventCard for each event
+
+
+BACKEND (event.controller.ts):
+    getEvents = async (req, res) => {
+        const { page, limit, search, category } = req.query;
+        
+        // Build query - only published events
+        const query = eventRepository
+            .createQueryBuilder('event')
+            .where('event.isPublished = :isPublished', { isPublished: true })
+            .leftJoinAndSelect('event.category', 'category')
+            .leftJoinAndSelect('event.ticketTypes', 'ticketTypes');
+        
+        // Apply filters...
+        // Execute and return
+    };
+
+
+CLICK ON EVENT CARD → Navigate to /events/:id
+
+
+================================================================================
+PART 3: EVENT DETAILS PAGE (/events/:id)
+================================================================================
+
+WHAT USER SEES:
+┌──────────────────────────────────────────────────────────────────────────────┐
+│  [Banner Image or Video]                                                      │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  Concert 2024                                                                 │
+│  📅 July 15, 2024 at 6:00 PM                                                 │
+│  📍 Central Park, New York                                                   │
+│  🏷️ Music | 👤 Organizer: John Smith                                        │
+│                                                                              │
+│  DESCRIPTION                                                                  │
+│  Amazing summer concert...                                                   │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  TICKETS                                                                      │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ Regular           FREE            Available: 350/500                   │ │
+│  │                                   [Button based on role]               │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ VIP (Early Bird)  $49.99          Available: 35/50                     │ │
+│  │                   ~~$99.99~~      5 early bird left!                   │ │
+│  │                                   [Button based on role]               │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+================================================================================
+PART 4: ROLE-BASED BUTTON LOGIC (CRITICAL!)
+================================================================================
+
+FRONTEND CONDITIONAL RENDERING (EventDetailsPage.tsx):
+
+    {user?.role === UserRole.ATTENDEE ? (
+        // ATTENDEE: Can book
+        ticket.capacity - ticket.sold > 0 ? (
+            <Button onClick={() => handleBookTicket(ticket)}>
+                Book Now
+            </Button>
+        ) : (
+            <Button disabled>Sold Out</Button>
+        )
+    ) : !user ? (
+        // NOT LOGGED IN: Redirect to login
+        <Button as={Link} to="/login">
+            Login to Book
+        </Button>
+    ) : (
+        // ORGANIZER or ADMIN: Cannot book
+        <small className="text-muted">Attendees only</small>
+    )}
+
+
+WHAT EACH ROLE SEES:
+
+    ┌─────────────────────────────────────────────────────────────────┐
+    │ ROLE          │ BUTTON SHOWN            │ CAN BOOK?            │
+    ├─────────────────────────────────────────────────────────────────┤
+    │ Not logged in │ [Login to Book]         │ No - redirects       │
+    │ Attendee      │ [Book Now]              │ YES                  │
+    │ Attendee      │ [Sold Out] (disabled)   │ No - sold out        │
+    │ Organizer     │ "Attendees only" text   │ No                   │
+    │ Admin         │ "Attendees only" text   │ No                   │
+    └─────────────────────────────────────────────────────────────────┘
+
+
+CODE BREAKDOWN:
+
+    const { user } = useAuth();  // From AuthContext
+    
+    // Check 1: Is user logged in AND is attendee?
+    user?.role === UserRole.ATTENDEE
+    
+    // Check 2: Is user not logged in?
+    !user
+    
+    // Check 3: Otherwise (organizer/admin)
+    // Falls through to "Attendees only"
+
+
+================================================================================
+PART 5: BOOKING FLOW (Attendee Only)
+================================================================================
+
+STEP 1: Click "Book Now"
+    handleBookTicket(ticket) called
+    → Checks if logged in
+    → Opens Booking Modal
+
+
+STEP 2: Booking Modal
+┌──────────────────────────────────────────────────────────────────┐
+│  Book Ticket                                            ✕       │
+├──────────────────────────────────────────────────────────────────┤
+│  Ticket Type: VIP                                               │
+│  Price: $49.99                                                  │
+│                                                                  │
+│  Quantity: [1  ▼]                                               │
+│                                                                  │
+│  Total: $49.99                                                  │
+├──────────────────────────────────────────────────────────────────┤
+│                          [Cancel]  [Confirm Booking]             │
+└──────────────────────────────────────────────────────────────────┘
+
+
+STEP 3: Confirm Booking
+    confirmBooking() called
+    → Validates quantity <= available
+    → If price > 0: Show Payment Modal
+    → If price = 0: Direct booking (doBooking)
+
+
+STEP 4: Payment Modal (for paid tickets)
+    Shows Razorpay-style UI
+    User selects payment method
+    Click "Pay" → doBooking() called
+
+
+STEP 5: API Call
+    attendeeApi.bookTicket({
+        eventId: event.id,
+        ticketTypeId: selectedTicket.id,
+        quantity: quantity
+    });
+    
+    POST /api/attendee/bookings
+
+
+================================================================================
+PART 6: BACKEND PROTECTION (Double Layer)
+================================================================================
+
+LAYER 1: ROUTE MIDDLEWARE (attendee.routes.ts)
+
+    router.use(authenticate, authorize([UserRole.ATTENDEE]));
+    router.post('/bookings', attendeeController.bookTicket);
+    
+    authenticate: Verifies JWT token
+    authorize([UserRole.ATTENDEE]): Checks role === 'attendee'
+    
+    If organizer/admin tries: 403 Forbidden
+
+
+LAYER 2: CONTROLLER VALIDATION (attendee.controller.ts)
+
+    bookTicket = async (req, res) => {
+        const userId = req.user.userId;  // From JWT
+        
+        // Additional validations
+        if (!eventId || !ticketTypeId || !quantity) {
+            throw new ValidationError('Missing required fields');
+        }
+        
+        // Check event exists and is published
+        const event = await eventRepository.findOne({
+            where: { id: eventId }
+        });
+        if (!event) throw new NotFoundError('Event not found');
+        if (!event.isPublished) {
+            throw new ValidationError('Event not available');
+        }
+        
+        // Check availability
+        const ticketType = await ticketTypeRepository.findOne(...);
+        const available = ticketType.capacity - ticketType.sold;
+        if (available < quantity) {
+            throw new ValidationError(`Only ${available} tickets left`);
+        }
+        
+        // Create booking...
+    };
+
+
+PROTECTION SUMMARY:
+
+    Frontend: Button hidden/disabled for non-attendees
+    Route: authenticate + authorize([ATTENDEE])
+    Controller: Validates event, availability, quantity
+    Database: Transaction + Row locking for race conditions
+
+
+================================================================================
+PART 7: PUBLIC VS PROTECTED ROUTES
+================================================================================
+
+PUBLIC ROUTES (No auth required):
+    GET /api/events                    ← Browse events
+    GET /api/events/:id                ← Event details
+    GET /api/events/categories         ← Category list
+
+PROTECTED ROUTES (Attendee only):
+    POST /api/attendee/bookings        ← Book ticket
+    GET /api/attendee/bookings         ← My bookings
+    DELETE /api/attendee/bookings/:id  ← Cancel booking
+    POST /api/attendee/events/:id/reviews  ← Write review
+
+
+FRONTEND: Uses AuthContext to check user role
+BACKEND: Uses middleware chain for protection
+
+
+================================================================================
+PART 8: FRONTEND-BACKEND AUTH FLOW
+================================================================================
+
+HOW FRONTEND KNOWS USER ROLE:
+
+    1. User logs in → Backend returns JWT + user object
+    2. AuthContext stores: { user: { id, email, role }, token }
+    3. Every protected API call includes: Authorization: Bearer <token>
+    4. Components access: const { user } = useAuth()
+    5. Check role: user?.role === UserRole.ATTENDEE
+
+
+JWT TOKEN CONTENTS:
+    {
+        userId: "uuid",
+        role: "attendee",
+        iat: 1705123456,
+        exp: 1705209856
+    }
+
+
+AuthContext.tsx:
+    export const useAuth = () => {
+        const context = useContext(AuthContext);
+        return context;  // { user, token, login, logout }
+    };
+
+
+EventDetailsPage.tsx:
+    const { user } = useAuth();
+    
+    // Role check
+    if (user?.role === UserRole.ATTENDEE) {
+        // Show Book Now button
+    }
+
+
+================================================================================
+SUMMARY
+================================================================================
+
+BROWSE PAGE:
+    ✅ Public - anyone can view
+    Shows published events only
+    Clicking card → Event Details
+
+EVENT DETAILS PAGE:
+    ✅ Public - anyone can view
+    Ticket buttons change by role:
+        - Guest → "Login to Book"
+        - Attendee → "Book Now" or "Sold Out"
+        - Organizer/Admin → "Attendees only" text
+
+BOOKING PROTECTION:
+    Frontend: Role-based button rendering
+    Backend: authenticate + authorize([ATTENDEE]) middleware
+    Database: Transactions for race conditions
+
+WHY DOUBLE PROTECTION:
+    Frontend: Better UX (don't show unusable buttons)
+    Backend: Security (can't bypass with API calls)
+    
+    Never trust frontend alone! Always enforce on backend.
+
+================================================================================

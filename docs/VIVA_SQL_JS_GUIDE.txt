@@ -1,0 +1,637 @@
+================================================================================
+          VIVA PREPARATION: SQL & JS HANDLER FUNCTIONS
+          Practical Examples from Your Event Management Project
+================================================================================
+
+This guide prepares you for viva questions about writing SQL queries and
+JavaScript handler functions. All examples are from YOUR actual codebase.
+
+================================================================================
+PART 1: UNDERSTANDING THE QUESTIONS
+================================================================================
+
+WHAT THEY'RE ASKING:
+
+1. SQL QUERIES:
+   - Write a query to fetch specific data
+   - Write a query to update/delete records
+   - Write a query with JOINs to connect tables
+   - Write a query with filtering (WHERE) and sorting (ORDER BY)
+
+2. JS HANDLER FUNCTIONS:
+   - Write a function that handles an API request
+   - Write a function that updates state and calls an API
+   - Write a function that handles form submission
+   - Write a function with error handling and loading states
+
+
+================================================================================
+PART 2: SQL BASICS FOR YOUR PROJECT
+================================================================================
+
+YOUR DATABASE TABLES:
+    users           → id, email, password, firstName, lastName, role, status
+    categories      → id, name, slug
+    events          → id, organizerId, categoryId, title, description, startDateTime
+    ticket_types    → id, eventId, name, price, capacity, sold
+    bookings        → id, userId, eventId, ticketTypeId, quantity, status
+    reviews         → id, userId, eventId, rating, comment
+    waitlists       → id, userId, eventId, ticketTypeId, position
+
+COMMON SQL PATTERNS:
+
+    SELECT   → Get data
+    INSERT   → Add new data
+    UPDATE   → Modify existing data
+    DELETE   → Remove data
+    JOIN     → Connect tables
+    WHERE    → Filter results
+    ORDER BY → Sort results
+    LIMIT    → Limit number of results
+
+
+================================================================================
+EXAMPLE 1: Get All Published Events with Category
+================================================================================
+
+QUESTION: "Write SQL to fetch all published events with their category names"
+
+SQL:
+    SELECT 
+        events.id,
+        events.title,
+        events.start_date_time,
+        events.location,
+        categories.name AS category_name
+    FROM events
+    INNER JOIN categories ON events.category_id = categories.id
+    WHERE events.is_published = true
+    ORDER BY events.start_date_time ASC;
+
+EXPLANATION:
+    - SELECT: Choose columns we want
+    - INNER JOIN: Connect events to categories using category_id
+    - WHERE: Only published events (is_published = true)
+    - ORDER BY: Sort by date, earliest first (ASC)
+
+TypeORM EQUIVALENT (from your code):
+    const events = await eventRepository
+        .createQueryBuilder('event')
+        .leftJoinAndSelect('event.category', 'category')
+        .where('event.isPublished = :isPublished', { isPublished: true })
+        .orderBy('event.startDateTime', 'ASC')
+        .getMany();
+
+
+================================================================================
+EXAMPLE 2: Count Bookings for an Event
+================================================================================
+
+QUESTION: "Write SQL to count total bookings for event ID 'xyz'"
+
+SQL:
+    SELECT 
+        COUNT(*) AS total_bookings,
+        SUM(quantity) AS total_tickets
+    FROM bookings
+    WHERE event_id = 'xyz' AND status = 'confirmed';
+
+EXPLANATION:
+    - COUNT(*): Count number of booking rows
+    - SUM(quantity): Add up all quantities
+    - WHERE: Only for specific event AND confirmed bookings
+
+TypeORM EQUIVALENT:
+    const count = await bookingRepository.count({
+        where: { eventId: 'xyz', status: BookingStatus.CONFIRMED }
+    });
+
+
+================================================================================
+EXAMPLE 3: Update Ticket Sold Count After Booking
+================================================================================
+
+QUESTION: "Write SQL to increase sold count by 2 for a ticket type"
+
+SQL:
+    UPDATE ticket_types
+    SET sold = sold + 2, updated_at = NOW()
+    WHERE id = 'ticket-id-123';
+
+EXPLANATION:
+    - UPDATE: Modifying existing row
+    - SET sold = sold + 2: Increment current value by 2
+    - WHERE: Only update this specific ticket type
+
+TypeORM EQUIVALENT:
+    await ticketTypeRepository
+        .createQueryBuilder()
+        .update(TicketType)
+        .set({ sold: () => 'sold + 2' })
+        .where('id = :id', { id: 'ticket-id-123' })
+        .execute();
+
+
+================================================================================
+EXAMPLE 4: Cancel Booking and Update Status
+================================================================================
+
+QUESTION: "Write SQL to cancel a booking"
+
+SQL:
+    UPDATE bookings
+    SET 
+        status = 'cancelled',
+        cancelled_at = NOW()
+    WHERE id = 'booking-id' AND user_id = 'user-id';
+
+EXPLANATION:
+    - UPDATE: Change booking record
+    - SET: Update status and timestamp
+    - WHERE: Match booking ID AND user ID (security - user can only cancel their own)
+
+RESTORE TICKET (Second Query):
+    UPDATE ticket_types
+    SET sold = sold - 2
+    WHERE id = 'ticket-type-id';
+
+
+================================================================================
+EXAMPLE 5: Get User's Bookings with Event Details
+================================================================================
+
+QUESTION: "Write SQL to get all bookings for a user with event names"
+
+SQL:
+    SELECT 
+        bookings.id,
+        bookings.quantity,
+        bookings.total_price,
+        bookings.status,
+        bookings.booking_reference,
+        events.title AS event_title,
+        events.start_date_time,
+        ticket_types.name AS ticket_name
+    FROM bookings
+    INNER JOIN events ON bookings.event_id = events.id
+    INNER JOIN ticket_types ON bookings.ticket_type_id = ticket_types.id
+    WHERE bookings.user_id = 'user-123'
+    ORDER BY bookings.booked_at DESC;
+
+EXPLANATION:
+    - Multiple JOINs to get related data
+    - Aliases (AS) make column names clearer
+    - ORDER BY DESC: Most recent first
+
+TypeORM EQUIVALENT:
+    const bookings = await bookingRepository.find({
+        where: { userId: 'user-123' },
+        relations: ['event', 'ticketType'],
+        order: { createdAt: 'DESC' }
+    });
+
+
+================================================================================
+EXAMPLE 6: Approve Organizer (Admin Action)
+================================================================================
+
+QUESTION: "Write SQL to approve a pending organizer"
+
+SQL:
+    UPDATE users
+    SET status = 'active'
+    WHERE id = 'user-id' 
+      AND role = 'organizer' 
+      AND status = 'pending';
+
+EXPLANATION:
+    - UPDATE only if ALL conditions match
+    - role = 'organizer': Safety check
+    - status = 'pending': Only approve if currently pending
+
+CHECK AFFECTED ROWS:
+    If 0 rows affected → User was not pending or not organizer
+
+
+================================================================================
+EXAMPLE 7: Delete Event with Related Data
+================================================================================
+
+QUESTION: "Write SQL to delete an event and its related data"
+
+SQL (In Order - Due to Foreign Keys):
+    -- Step 1: Delete bookings
+    DELETE FROM bookings WHERE event_id = 'event-123';
+    
+    -- Step 2: Delete ticket types
+    DELETE FROM ticket_types WHERE event_id = 'event-123';
+    
+    -- Step 3: Delete reviews
+    DELETE FROM reviews WHERE event_id = 'event-123';
+    
+    -- Step 4: Delete the event
+    DELETE FROM events WHERE id = 'event-123';
+
+EXPLANATION:
+    - Must delete child records BEFORE parent (foreign key constraint)
+    - Or use CASCADE in table definition to auto-delete
+
+TypeORM with Transaction:
+    await AppDataSource.transaction(async (manager) => {
+        await manager.delete(Booking, { eventId: 'event-123' });
+        await manager.delete(TicketType, { eventId: 'event-123' });
+        await manager.delete(Review, { eventId: 'event-123' });
+        await manager.delete(Event, { id: 'event-123' });
+    });
+
+
+================================================================================
+PART 3: JS HANDLER FUNCTIONS
+================================================================================
+
+HANDLER FUNCTION STRUCTURE:
+
+    const handlerName = async (req, res) => {
+        try {
+            // 1. Extract data from request
+            // 2. Validate input
+            // 3. Perform database operation
+            // 4. Send success response
+        } catch (error) {
+            // 5. Handle errors
+        }
+    };
+
+
+================================================================================
+EXAMPLE 1: Book Ticket Handler (Backend)
+================================================================================
+
+QUESTION: "Write a handler to book a ticket"
+
+const bookTicket = async (req, res) => {
+    try {
+        // 1. Extract data
+        const userId = req.user.userId;  // From JWT middleware
+        const { eventId, ticketTypeId, quantity } = req.body;
+        
+        // 2. Validate input
+        if (!eventId || !ticketTypeId || !quantity) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Missing required fields' 
+            });
+        }
+        
+        if (quantity < 1) {
+            return res.status(400).json({ 
+                success: false, 
+                message: 'Quantity must be at least 1' 
+            });
+        }
+        
+        // 3. Check ticket availability
+        const ticketType = await ticketTypeRepository.findOne({
+            where: { id: ticketTypeId }
+        });
+        
+        if (!ticketType) {
+            return res.status(404).json({ 
+                success: false, 
+                message: 'Ticket type not found' 
+            });
+        }
+        
+        const available = ticketType.capacity - ticketType.sold;
+        if (available < quantity) {
+            return res.status(400).json({ 
+                success: false, 
+                message: `Only ${available} tickets available` 
+            });
+        }
+        
+        // 4. Calculate price and create booking
+        const totalPrice = ticketType.price * quantity;
+        
+        const booking = bookingRepository.create({
+            userId,
+            eventId,
+            ticketTypeId,
+            quantity,
+            totalPrice,
+            status: 'confirmed'
+        });
+        
+        await bookingRepository.save(booking);
+        
+        // 5. Update sold count
+        ticketType.sold += quantity;
+        await ticketTypeRepository.save(ticketType);
+        
+        // 6. Send success response
+        return res.status(201).json({
+            success: true,
+            message: 'Booking successful',
+            data: { booking }
+        });
+        
+    } catch (error) {
+        console.error('Booking error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to book ticket'
+        });
+    }
+};
+
+
+================================================================================
+EXAMPLE 2: Cancel Booking Handler (Backend)
+================================================================================
+
+QUESTION: "Write a handler to cancel a booking"
+
+const cancelBooking = async (req, res) => {
+    try {
+        // 1. Extract data
+        const userId = req.user.userId;
+        const { id } = req.params;  // Booking ID from URL
+        
+        // 2. Find the booking
+        const booking = await bookingRepository.findOne({
+            where: { id, userId },  // Ensure user owns this booking
+            relations: ['ticketType']
+        });
+        
+        if (!booking) {
+            return res.status(404).json({
+                success: false,
+                message: 'Booking not found'
+            });
+        }
+        
+        // 3. Check if already cancelled
+        if (booking.status === 'cancelled') {
+            return res.status(400).json({
+                success: false,
+                message: 'Booking is already cancelled'
+            });
+        }
+        
+        // 4. Update booking status
+        booking.status = 'cancelled';
+        booking.cancelledAt = new Date();
+        await bookingRepository.save(booking);
+        
+        // 5. Restore ticket availability
+        const ticketType = booking.ticketType;
+        ticketType.sold -= booking.quantity;
+        await ticketTypeRepository.save(ticketType);
+        
+        // 6. Send response
+        return res.status(200).json({
+            success: true,
+            message: 'Booking cancelled successfully'
+        });
+        
+    } catch (error) {
+        console.error('Cancel error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to cancel booking'
+        });
+    }
+};
+
+
+================================================================================
+EXAMPLE 3: Frontend Form Handler (React)
+================================================================================
+
+QUESTION: "Write a function to handle login form submission"
+
+const handleLogin = async (e) => {
+    e.preventDefault();  // Prevent page refresh
+    
+    // 1. Clear previous errors
+    setError('');
+    setLoading(true);
+    
+    try {
+        // 2. Validate input
+        if (!email || !password) {
+            setError('Email and password are required');
+            return;
+        }
+        
+        // 3. Make API call
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password })
+        });
+        
+        const data = await response.json();
+        
+        // 4. Handle response
+        if (!response.ok) {
+            setError(data.message || 'Login failed');
+            return;
+        }
+        
+        // 5. Store token and redirect
+        localStorage.setItem('token', data.token);
+        setUser(data.user);
+        navigate('/');
+        
+    } catch (error) {
+        setError('Network error. Please try again.');
+    } finally {
+        setLoading(false);
+    }
+};
+
+
+================================================================================
+EXAMPLE 4: Frontend Event Handler (State Update)
+================================================================================
+
+QUESTION: "Write a function to handle quantity change in booking"
+
+const handleQuantityChange = (ticketId, newQuantity) => {
+    // 1. Validate
+    if (newQuantity < 0) return;
+    
+    // 2. Find ticket to check max
+    const ticket = event.ticketTypes.find(t => t.id === ticketId);
+    const maxAvailable = ticket.capacity - ticket.sold;
+    
+    if (newQuantity > maxAvailable) {
+        alert(`Only ${maxAvailable} tickets available`);
+        return;
+    }
+    
+    // 3. Update state
+    setSelectedTickets(prev => ({
+        ...prev,
+        [ticketId]: newQuantity
+    }));
+};
+
+// Usage in JSX:
+<button onClick={() => handleQuantityChange(ticket.id, quantity + 1)}>+</button>
+<button onClick={() => handleQuantityChange(ticket.id, quantity - 1)}>-</button>
+
+
+================================================================================
+EXAMPLE 5: Create Event Handler (Full CRUD)
+================================================================================
+
+QUESTION: "Write a handler to create a new event"
+
+const createEvent = async (req, res) => {
+    try {
+        // 1. Get organizer ID from JWT
+        const organizerId = req.user.userId;
+        
+        // 2. Extract event data
+        const { 
+            title, 
+            description, 
+            startDateTime, 
+            endDateTime,
+            location,
+            categoryId,
+            ticketTypes 
+        } = req.body;
+        
+        // 3. Validate required fields
+        if (!title || !description || !startDateTime || !location || !categoryId) {
+            return res.status(400).json({
+                success: false,
+                message: 'Missing required fields'
+            });
+        }
+        
+        // 4. Validate dates
+        const start = new Date(startDateTime);
+        const end = new Date(endDateTime);
+        
+        if (end <= start) {
+            return res.status(400).json({
+                success: false,
+                message: 'End date must be after start date'
+            });
+        }
+        
+        // 5. Create event
+        const event = eventRepository.create({
+            organizerId,
+            title,
+            description,
+            startDateTime: start,
+            endDateTime: end,
+            location,
+            categoryId,
+            isPublished: true
+        });
+        
+        const savedEvent = await eventRepository.save(event);
+        
+        // 6. Create ticket types
+        for (const ticketData of ticketTypes) {
+            const ticketType = ticketTypeRepository.create({
+                eventId: savedEvent.id,
+                name: ticketData.name,
+                price: ticketData.price || 0,
+                capacity: ticketData.capacity,
+                sold: 0
+            });
+            await ticketTypeRepository.save(ticketType);
+        }
+        
+        // 7. Send response
+        return res.status(201).json({
+            success: true,
+            message: 'Event created successfully',
+            data: { event: savedEvent }
+        });
+        
+    } catch (error) {
+        console.error('Create event error:', error);
+        return res.status(500).json({
+            success: false,
+            message: 'Failed to create event'
+        });
+    }
+};
+
+
+================================================================================
+PART 4: COMMON VIVA QUESTIONS & ANSWERS
+================================================================================
+
+Q: "What is a foreign key?"
+A: A column that references the primary key of another table.
+   Example: bookings.user_id references users.id
+
+Q: "What is a JOIN?"
+A: Combines rows from two or more tables based on a related column.
+   Example: JOIN events ON bookings.event_id = events.id
+
+Q: "What is a transaction?"
+A: A group of operations that must ALL succeed or ALL fail.
+   Used for: Booking (create booking + update sold count)
+
+Q: "Why use try-catch?"
+A: To handle errors gracefully without crashing the server.
+   Catch database errors, validation errors, etc.
+
+Q: "What is req.body vs req.params vs req.query?"
+A: req.body: POST/PUT data (JSON body)
+   req.params: URL parameters (/events/:id → req.params.id)
+   req.query: Query string (/events?page=1 → req.query.page)
+
+Q: "What does async/await do?"
+A: Makes asynchronous code look synchronous.
+   await pauses until the promise resolves.
+
+
+================================================================================
+QUICK REFERENCE CHEAT SHEET
+================================================================================
+
+SQL:
+    SELECT * FROM table WHERE condition;
+    INSERT INTO table (col1, col2) VALUES (val1, val2);
+    UPDATE table SET col = value WHERE condition;
+    DELETE FROM table WHERE condition;
+    SELECT * FROM t1 JOIN t2 ON t1.id = t2.foreign_id;
+
+JS Handler Pattern:
+    const handler = async (req, res) => {
+        try {
+            const data = req.body;           // Get input
+            // validate...
+            const result = await db.save();  // DB operation
+            res.status(200).json({ success: true, data: result });
+        } catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    };
+
+React Handler Pattern:
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setLoading(true);
+        try {
+            await api.post('/endpoint', formData);
+            navigate('/success');
+        } catch (error) {
+            setError(error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+================================================================================

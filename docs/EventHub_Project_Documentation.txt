@@ -1,0 +1,428 @@
+================================================================================
+                           EVENT HUB - PROJECT DOCUMENTATION
+================================================================================
+
+--------------------------------------------------------------------------------
+                              STUDENT INFORMATION
+--------------------------------------------------------------------------------
+
+Name        : Vishwas Mehta
+Roll No     : 22F3001150
+Email       : 22f3001150@ds.study.iitm.ac.in
+GitHub      : https://github.com/vishwas-mehta/Event-Management
+Project     : Event Hub - Full Stack Event Management System
+
+================================================================================
+                                 TECH STACK
+================================================================================
+
+FRONTEND:
+---------
+• React 19.2.0          - UI library for building user interfaces
+• React Router DOM 6.20 - Client-side routing
+• Vite 7.2.4            - Build tool and development server
+• TypeScript 5.9        - Type-safe JavaScript
+• Axios 1.6.2           - HTTP client for API requests
+• Bootstrap 5.3.2       - CSS framework for styling
+• React Bootstrap 2.9.1 - Bootstrap components for React
+• React Hook Form 7.68  - Form handling and validation
+• Lucide React          - Icon library
+• Date-fns              - Date utility library
+
+BACKEND:
+--------
+• Node.js + Express 5.1 - Server framework
+• TypeScript            - Type-safe JavaScript
+• TypeORM 0.3.27        - ORM for database operations
+• PostgreSQL (pg 8.16)  - Relational database
+• Redis 5.10            - Caching layer
+• JWT (jsonwebtoken)    - Authentication tokens
+• Bcryptjs              - Password hashing
+• Google Generative AI  - Gemini API for chatbot
+• Class Validator       - Request validation
+• UUID                  - Unique identifier generation
+
+================================================================================
+                              FOLDER STRUCTURE
+================================================================================
+
+Event-Management/
+├── backend/
+│   ├── src/
+│   │   ├── config/          # Database & Redis configuration
+│   │   ├── controllers/     # Request handlers (6 controllers)
+│   │   │   ├── admin.controller.ts
+│   │   │   ├── attendee.controller.ts
+│   │   │   ├── auth.controller.ts
+│   │   │   ├── chatbot.controller.ts
+│   │   │   ├── event.controller.ts
+│   │   │   └── organizer.controller.ts
+│   │   ├── entities/        # TypeORM database models (8 entities)
+│   │   ├── errors/          # Custom error classes
+│   │   ├── middlewares/     # Auth & role middlewares
+│   │   ├── routes/          # API route definitions
+│   │   ├── seeds/           # Database seeding scripts
+│   │   ├── services/        # Business logic services
+│   │   ├── utils/           # Utility functions
+│   │   ├── validators/      # Request validators
+│   │   ├── knowledge/       # Chatbot knowledge base
+│   │   ├── app.ts           # Express app setup
+│   │   └── server.ts        # Server entry point
+│   ├── package.json
+│   └── tsconfig.json
+│
+├── frontend/
+│   ├── src/
+│   │   ├── api/             # API service functions
+│   │   ├── components/      # Reusable UI components
+│   │   │   ├── Chatbot/     # AI chatbot component
+│   │   │   ├── Common/      # Shared components
+│   │   │   ├── Events/      # Event-related components
+│   │   │   ├── Layout/      # Header, Footer, Navbar
+│   │   │   └── Payment/     # Payment modal component
+│   │   ├── contexts/        # React context providers
+│   │   ├── pages/           # Page components
+│   │   │   ├── Admin/       # Admin dashboard pages
+│   │   │   ├── Attendee/    # User booking pages
+│   │   │   ├── Auth/        # Login/Register pages
+│   │   │   ├── Events/      # Event listing/details
+│   │   │   ├── Home/        # Homepage
+│   │   │   ├── Organizer/   # Event management pages
+│   │   │   └── Profile/     # User profile page
+│   │   ├── types/           # TypeScript type definitions
+│   │   ├── utils/           # Helper functions
+│   │   ├── App.tsx          # Main app component
+│   │   └── main.tsx         # Entry point
+│   ├── package.json
+│   └── vite.config.ts
+└── README.md
+
+================================================================================
+                               API ENDPOINTS
+================================================================================
+
+BASE URL: /api
+
+AUTHENTICATION (/api/auth)
+--------------------------
+POST   /register          - Register new user
+POST   /login             - User login
+GET    /me                - Get current user profile
+PUT    /profile           - Update user profile
+POST   /logout            - User logout
+
+PUBLIC EVENTS (/api/events)
+---------------------------
+GET    /                  - List all events (with filters)
+GET    /categories        - Get all categories
+GET    /:id               - Get event details
+POST   /:id/report        - Report an event (auth required)
+GET    /:eventId/reviews  - Get event reviews
+
+ATTENDEE (/api/attendee) [Requires Auth]
+----------------------------------------
+POST   /bookings                    - Book tickets
+GET    /bookings                    - Get user's bookings
+GET    /bookings/:id                - Get booking details
+DELETE /bookings/:id                - Cancel booking
+POST   /bookings/:id/attend         - Mark attendance
+POST   /events/:eventId/reviews     - Create review
+PUT    /reviews/:id                 - Update review
+DELETE /reviews/:id                 - Delete review
+POST   /events/:eventId/waitlist    - Join waitlist
+DELETE /events/:eventId/waitlist    - Leave waitlist
+GET    /waitlist                    - Get user's waitlists
+
+ORGANIZER (/api/organizer) [Requires Auth + Organizer Role]
+-----------------------------------------------------------
+GET    /dashboard                              - Get dashboard stats
+GET    /events                                 - Get organizer's events
+POST   /events                                 - Create new event
+GET    /events/:id                             - Get event details
+PUT    /events/:id                             - Update event
+DELETE /events/:id                             - Delete event
+GET    /events/:id/bookings                    - Get event attendees
+POST   /events/:eventId/ticket-types           - Create ticket type
+PUT    /events/:eventId/ticket-types/:id       - Update ticket type
+DELETE /events/:eventId/ticket-types/:id       - Delete ticket type
+
+ADMIN (/api/admin) [Requires Auth + Admin Role]
+-----------------------------------------------
+GET    /dashboard                   - Admin dashboard stats
+GET    /users                       - Get all users
+PATCH  /users/:id/status            - Update user status
+GET    /pending-organizers          - Get pending organizers
+POST   /organizers/:id/approve      - Approve organizer
+POST   /organizers/:id/reject       - Reject organizer
+GET    /reported-events             - Get reported events
+POST   /reported-events/:id/resolve - Resolve report
+DELETE /events/:id                  - Delete event
+
+CHATBOT (/api/chatbot)
+----------------------
+POST   /chat    - Send message to AI chatbot
+GET    /health  - Check chatbot service health
+
+================================================================================
+                            DATABASE STRUCTURE
+================================================================================
+
+DATABASE: PostgreSQL
+
+TABLE: users
+------------
+id              UUID PRIMARY KEY
+email           VARCHAR UNIQUE
+password        VARCHAR
+first_name      VARCHAR
+last_name       VARCHAR
+role            ENUM (admin, organizer, attendee)
+status          ENUM (active, pending, blocked)
+phone_number    VARCHAR (nullable)
+profile_image   VARCHAR (nullable)
+created_at      TIMESTAMP
+updated_at      TIMESTAMP
+
+TABLE: categories
+-----------------
+id              UUID PRIMARY KEY
+name            VARCHAR UNIQUE
+slug            VARCHAR UNIQUE
+description     TEXT (nullable)
+icon            VARCHAR (nullable)
+created_at      TIMESTAMP
+
+TABLE: events
+-------------
+id              UUID PRIMARY KEY
+organizer_id    UUID (FK -> users)
+category_id     UUID (FK -> categories)
+title           VARCHAR
+description     TEXT
+start_date_time TIMESTAMP
+end_date_time   TIMESTAMP
+banner_image    VARCHAR (nullable)
+teaser_video    VARCHAR (nullable)
+location        VARCHAR
+address         VARCHAR (nullable)
+latitude        DECIMAL(10,7) (nullable)
+longitude       DECIMAL(10,7) (nullable)
+capacity        INTEGER
+is_published    BOOLEAN
+is_reported     BOOLEAN
+report_reason   TEXT (nullable)
+created_at      TIMESTAMP
+updated_at      TIMESTAMP
+
+TABLE: ticket_types
+-------------------
+id               UUID PRIMARY KEY
+event_id         UUID (FK -> events)
+name             VARCHAR
+description      TEXT (nullable)
+price            DECIMAL(10,2)
+capacity         INTEGER
+sold             INTEGER
+dynamic_pricing  JSONB (nullable)
+sales_start_date TIMESTAMP (nullable)
+sales_end_date   TIMESTAMP (nullable)
+created_at       TIMESTAMP
+updated_at       TIMESTAMP
+
+TABLE: bookings
+---------------
+id                UUID PRIMARY KEY
+user_id           UUID (FK -> users)
+event_id          UUID (FK -> events)
+ticket_type_id    UUID (FK -> ticket_types)
+quantity          INTEGER
+total_price       DECIMAL(10,2)
+status            ENUM (confirmed, cancelled, attended)
+booking_reference VARCHAR UNIQUE
+payment_status    ENUM (pending, completed, failed, refunded)
+payment_method    VARCHAR (nullable)
+booked_at         TIMESTAMP
+cancelled_at      TIMESTAMP (nullable)
+attended_at       TIMESTAMP (nullable)
+created_at        TIMESTAMP
+
+TABLE: reviews
+--------------
+id                  UUID PRIMARY KEY
+user_id             UUID (FK -> users)
+event_id            UUID (FK -> events)
+rating              INTEGER
+comment             TEXT (nullable)
+media_files         JSONB (nullable)
+is_verified_attendee BOOLEAN
+created_at          TIMESTAMP
+updated_at          TIMESTAMP
+UNIQUE(user_id, event_id)
+
+TABLE: waitlists
+----------------
+id              UUID PRIMARY KEY
+user_id         UUID (FK -> users)
+event_id        UUID (FK -> events)
+ticket_type_id  UUID (FK -> ticket_types, nullable)
+position        INTEGER
+status          ENUM (waiting, notified, converted, expired)
+joined_at       TIMESTAMP
+notified_at     TIMESTAMP (nullable)
+created_at      TIMESTAMP
+UNIQUE(user_id, event_id, ticket_type_id)
+
+TABLE: reported_events
+----------------------
+id              UUID PRIMARY KEY
+event_id        UUID (FK -> events)
+reported_by_id  UUID (FK -> users)
+reason          TEXT
+status          ENUM (pending, reviewed, resolved)
+admin_notes     TEXT (nullable)
+resolved_at     TIMESTAMP (nullable)
+created_at      TIMESTAMP
+
+================================================================================
+                              KEY FEATURES
+================================================================================
+
+• Role-Based Access Control (Admin, Organizer, Attendee)
+• Event Creation & Management with Multiple Ticket Types
+• Real-time Ticket Booking with Capacity Management
+• Waitlist System for Sold-out Events
+• Review & Rating System for Events
+• Event Reporting & Moderation
+• AI-Powered Chatbot using Gemini API
+• Redis Caching for Performance Optimization
+• Dummy Payment Flow with Payment Modal UI
+• Responsive Design with Modern UI/UX
+
+================================================================================
+                       PROJECT ARCHITECTURE EXPLANATION
+================================================================================
+
+FRONTEND ARCHITECTURE
+---------------------
+
+The frontend follows a component-based architecture using React with TypeScript.
+
+1. ENTRY POINT (main.tsx & App.tsx)
+   - main.tsx initializes React and renders the App component
+   - App.tsx contains route definitions and wraps the app with AuthContext
+
+2. PAGES DIRECTORY (/pages)
+   Each folder represents a feature module:
+   - Auth/       : Login and Register pages for user authentication
+   - Home/       : Landing page showcasing featured events
+   - Events/     : Event listing page with filters & Event detail page
+   - Attendee/   : User's bookings and waitlist management
+   - Organizer/  : Dashboard for creating/managing events & ticket types
+   - Admin/      : Admin panel for user management, approvals & reports
+   - Profile/    : User profile viewing and editing
+
+3. COMPONENTS DIRECTORY (/components)
+   Reusable UI components shared across pages:
+   - Common/     : Loading spinners, error messages, pagination
+   - Layout/     : Header, Footer, Navbar used on every page
+   - Events/     : Event cards for listing display
+   - Payment/    : Payment modal UI for ticket booking
+   - Chatbot/    : AI chatbot floating widget
+
+4. API DIRECTORY (/api)
+   Contains Axios service functions organized by feature:
+   - Each file handles API calls for a specific module
+   - Centralizes HTTP requests and error handling
+   - Uses interceptors for auth token attachment
+
+5. CONTEXTS DIRECTORY (/contexts)
+   React Context for global state management:
+   - AuthContext: Manages user authentication state, login/logout
+
+6. TYPES DIRECTORY (/types)
+   TypeScript interfaces and type definitions:
+   - Ensures type safety across the application
+   - Defines shapes for User, Event, Booking, etc.
+
+7. UTILS DIRECTORY (/utils)
+   Helper functions:
+   - Date formatting, price formatting
+   - Local storage helpers, validation utilities
+
+DATA FLOW: User Action → Component → API Service → Backend → Response → State Update → UI Re-render
+
+--------------------------------------------------------------------------------
+
+BACKEND ARCHITECTURE
+--------------------
+
+The backend follows MVC (Model-View-Controller) pattern with Express.js.
+
+1. ENTRY POINT (server.ts & app.ts)
+   - server.ts: Starts the HTTP server, connects to database & Redis
+   - app.ts: Configures Express middleware, CORS, and mounts all routes
+
+2. ENTITIES DIRECTORY (/entities) - MODEL LAYER
+   TypeORM entity classes that map to database tables:
+   - User.entity.ts      : User accounts with roles (admin/organizer/attendee)
+   - Event.entity.ts     : Event details with location, capacity, media
+   - Category.entity.ts  : Event categories (Music, Tech, Sports, etc.)
+   - TicketType.entity.ts: Ticket tiers with pricing and capacity
+   - Booking.entity.ts   : User ticket bookings with payment status
+   - Review.entity.ts    : User reviews and ratings for events
+   - Waitlist.entity.ts  : Queue for sold-out events
+   - ReportedEvent.entity.ts: Flagged events for admin review
+
+3. ROUTES DIRECTORY (/routes) - ROUTING LAYER
+   Defines API endpoints and maps them to controllers:
+   - auth.routes.ts      : /api/auth/* - Authentication endpoints
+   - event.routes.ts     : /api/events/* - Public event endpoints
+   - attendee.routes.ts  : /api/attendee/* - Booking & review endpoints
+   - organizer.routes.ts : /api/organizer/* - Event management endpoints
+   - admin.routes.ts     : /api/admin/* - User & report management
+   - chatbot.routes.ts   : /api/chatbot/* - AI chatbot endpoint
+
+4. CONTROLLERS DIRECTORY (/controllers) - CONTROLLER LAYER
+   Handle incoming requests and send responses:
+   - Receive HTTP requests from routes
+   - Validate input data
+   - Call appropriate services/database operations
+   - Return JSON responses with proper status codes
+
+5. MIDDLEWARES DIRECTORY (/middlewares)
+   Functions that process requests before reaching controllers:
+   - auth.middleware.ts  : Verifies JWT tokens, extracts user info
+   - role.middleware.ts  : Checks user role permissions (admin/organizer)
+   - Error handling middleware for consistent error responses
+
+6. CONFIG DIRECTORY (/config)
+   Application configuration:
+   - database.ts : PostgreSQL connection using TypeORM DataSource
+   - redis.ts    : Redis client for caching frequently accessed data
+
+7. VALIDATORS DIRECTORY (/validators)
+   Request validation schemas:
+   - Uses class-validator for input validation
+   - Ensures data integrity before processing
+
+8. SERVICES DIRECTORY (/services)
+   Business logic layer:
+   - Chatbot service for Gemini AI integration
+   - Cache service for Redis operations
+
+9. UTILS DIRECTORY (/utils)
+   Utility functions:
+   - JWT token generation and verification
+   - Password hashing with bcrypt
+   - Response formatting helpers
+
+10. KNOWLEDGE DIRECTORY (/knowledge)
+    Contains knowledge base text file for AI chatbot context
+
+REQUEST FLOW:
+HTTP Request → Route → Middleware (Auth/Role Check) → Controller → 
+Database/Service → Response → Client
+
+================================================================================
+                              END OF DOCUMENT
+================================================================================
