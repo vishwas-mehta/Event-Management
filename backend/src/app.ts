@@ -38,8 +38,6 @@ app.use(
 // Body parsing middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-console.log("recieved");
 // Health check endpoint
 app.get('/health', (req, res) => {
     res.json({

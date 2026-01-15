@@ -3,6 +3,7 @@ node_modules/
 package-lock.json
 yarn.lock
 # Environment variables
+.txt
 .env
 .env.local
 .env.*.local
@@ -23,4 +24,3 @@ Thumbs.db
 # Uploads
 uploads/
 # Testing
-*.md
