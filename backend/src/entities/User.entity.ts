@@ -12,15 +12,29 @@ import { Review } from './Review.entity';
 import { Waitlist } from './Waitlist.entity';
 import { ReportedEvent } from './ReportedEvent.entity';
 
+/**
+ * Enum representing the possible roles a user can have in the system.
+ * @enum {string}
+ */
 export enum UserRole {
+    /** System administrator with full access */
     ADMIN = 'admin',
+    /** Event organizer who can create and manage events */
     ORGANIZER = 'organizer',
+    /** Regular user who can attend events */
     ATTENDEE = 'attendee',
 }
 
+/**
+ * Enum representing the account status of a user.
+ * @enum {string}
+ */
 export enum UserStatus {
+    /** Account is active and fully functional */
     ACTIVE = 'active',
+    /** Account is pending verification or activation */
     PENDING = 'pending',
+    /** Account has been blocked by an administrator */
     BLOCKED = 'blocked',
 }
 
