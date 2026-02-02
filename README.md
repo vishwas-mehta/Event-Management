@@ -197,7 +197,6 @@ Before you begin, ensure you have the following installed:
 - **Node.js** >= 16.x ([Download](https://nodejs.org/))
 - **PostgreSQL** >= 13.x ([Download](https://www.postgresql.org/download/))
 - **npm** or **yarn**
-- **Git**
 
 ### Installation
 
