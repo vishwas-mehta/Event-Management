@@ -830,6 +830,6 @@ If you have any questions or need help, please:
 
 **⭐ Star this repository if you found it helpful!**
 
-Made with TypeScript and ☕
+Made with TypeScript
 
 </div>
