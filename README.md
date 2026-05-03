@@ -813,7 +813,7 @@ Built with ❤️ using TypeScript, React, Node.js, and PostgreSQL
 - React Bootstrap for UI components
 - TypeORM for excellent database abstraction
 - Vite for blazing-fast development experience
-- The open-source community for amazing tools and libraries
+- The open-source community for amazing tools and libraries 
 
 ---
 
